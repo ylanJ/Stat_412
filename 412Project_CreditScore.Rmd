@@ -10,6 +10,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(MASS)
+library(glmnet)
 ```
 
 ## NA data (Income NA), Minority, Majority Groups
@@ -24,8 +25,8 @@ library(MASS)
 
 ```{r}
 # Read Credit Scoring Data Training Set
-cs_train <- cs_training
-#cs_train = read.csv("cs-training.csv")
+#cs_train <- cs_training
+cs_train = read.csv("cs-training.csv")
 cs_train[1:10,]
 is.na(cs_train[7,]$MonthlyIncome)
 
@@ -55,17 +56,61 @@ head(cs_train[cs_train$NA_Indicator==1,])  # Check the ones indicated as NA
 ```{r}
 summary(cs_train)
 ```
-
 ```{r}
-#hist(cs_train$`NumberOfTime30-59DaysPastDueNotWorse`>6)
+
+hist(cs_train[,2]) #Response Variable
+hist(cs_train[,3]) #RevolvingUtilizationOfUnsecuredLines
+hist(cs_train[,4]) #age
+hist(cs_train[,5]) #NumberOfTime30.59DaysPastDueNotWorse
+hist(cs_train[,6]) #DebtRatio
+hist(cs_train[,7]) #MonthlyIncome
+hist(cs_train[,8]) #NumberOfOpenCreditLinesAndLoans
+hist(cs_train[,9]) #NumberOfTimes90DaysLate
+hist(cs_train[,10])#NumberRealEstateLoansOrLines
+hist(cs_train[,11])#NumberOfTime60.89DaysPastDueNotWorse
+hist(cs_train[,12])#NumberOfDependents
+hist(cs_train[,13])#NA_Indicator
+
 ```
 
 ```{r}
+cs_train$HighRevolving <- 0
+cs_train$HighRevolving[quantile(cs_train[,3],0.95)] <- 1
+
+cs_train$Many_LessThan2MonthsLate <- 0
+cs_train$Many_LessThan2MonthsLate[quantile(cs_train[,5],0.95)] <- 1
+
+cs_train$HighDebtRatio <- 0 
+cs_train$HighDebtRatio[quantile(cs_train[,6],0.95)] <- 1
+
+cs_train$Many_CurrentLoans <- 0
+cs_train$Many_CurrentLoans[quantile(cs_train[,8],0.95)] <- 1
+
+cs_train$Many_AtLeastThreeMonthsLate <- 0
+cs_train$Many_AtLeastThreeMonthsLate[quantile(cs_train[,9],0.95)] <- 1
+
+cs_train$Many_HouseLoans <- 0
+cs_train$Many_HouseLoans[quantile(cs_train[,10],0.95)] <- 1
+
+cs_train$Many_TwoToThreeMonthsLate <- 0
+cs_train$Many_TwoToThreeMonthsLate[quantile(cs_train[,11],0.95)] <- 1
+
+cs_train$NA_Dependents_are_Mean <- cs_train[,12] #Need to Change NA values to Mean before sorting through quantiles.
+cs_train$NA_Dependents_are_Mean[is.na(cs_train[,12])] <- mean(cs_train[,12], na.rm = TRUE)
+cs_train$Many_Dependents <- 0
+cs_train$Many_Dependents[quantile(cs_train$NA_Dependents_are_Mean,0.95)] <- 1
+
+train1 <-cs_train[cs_train[,3]< quantile(cs_train[,3],0.95),]
 
 ```
 
 ```{r}
+cs_train
+```
 
+```{r}
+train2 <- train1[train1[,5]< quantile(train1[,5],0.99),]
+hist(train1[,3]) #Do we make transformation for predictors? Not Normal Distribution
 ```
 
 ```{r}
@@ -151,7 +196,7 @@ n_maj <- nrow(dat) # get number of rows
 # Initial assignments to three groups that will need to update
 assignments <- factor(sample(c(1,2,3), n_maj, replace = TRUE))
 #plot(dat, col=assignments, xlim = c(0,110), asp=1)
-plot(dat, col=assignments)
+#plot(dat, col=assignments)
 ```
 
 ```{r}
@@ -189,9 +234,54 @@ head(cs_train_min_add)
 
 
 ```{r}
-model <- glm(cs_train$SeriousDlqin2yrs ~ ., family = "binomial", data = cs_train)
+model <- glm(cs_train$SeriousDlqin2yrs ~ cs_train[,3] +cs_train[,4] +cs_train[,5] +cs_train[,6] +cs_train[,7] +cs_train[,8] +cs_train[,9] +cs_train[,10] +cs_train[,11] +cs_train[,12], family = "binomial", data = cs_train) 
+#To Change family link use family = quasi(variance = "mu^3", link = "log") change quasi
 summary(model)
+plot(model, which = 1) #Outliers skew residuals plot
 ```
 ```{r}
-stepAIC(model, direction = "forward")
+stepAIC(model)
+```
+```{r}
+model2 <- glm(cs_train$SeriousDlqin2yrs ~ MonthlyIncome + cs_train[,13] + cs_train[,14] + cs_train[,15] + cs_train[,16] + cs_train[,17] + cs_train[,18] + cs_train[,19] + cs_train[,20] + cs_train[,22], family = "binomial", data = cs_train)
+model2
+model2$rank # equals 7 which is how many variables are not NA
+#Certain Dummy Variables are a  Singular Matrix Meaning that some of our variables can be constructed using a linear combination of some of the columns
+#Not Sure what to do, but I'll remove these variables in the meantime
+```
+
+```{r}
+model3 <- glm(cs_train$SeriousDlqin2yrs ~ MonthlyIncome + cs_train[,15] + cs_train[,16] + cs_train[,17] + cs_train[,18] + cs_train[,19], family = "binomial", data = cs_train)
+model3
+```
+
+```{r}
+model4 <- glm(cs_train$SeriousDlqin2yrs ~ MonthlyIncome + cs_train[,15] + cs_train[,16] + cs_train[,17] + cs_train[,18] + cs_train[,19], family = binomial(link = "probit"), data = cs_train)
+model4
+```
+
+```{r}
+model5 <- glm(cs_train$SeriousDlqin2yrs ~ MonthlyIncome + cs_train[,15] + cs_train[,16] + cs_train[,17] + cs_train[,18] + cs_train[,19], family = binomial(link = "cloglog"), data = cs_train) #cloglog link
+model5
+```
+
+```{r}
+anova(model,model2,model3,model4,model5) #model 2 is the one with NA values
+#model 1 is the best but we can check model 5 using our dummy variables
+```
+
+```{r}
+x <- data.frame(cs_train$SeriousDlqin2yrs, cs_train$MonthlyIncome, cs_train[,15],cs_train[,16],cs_train[,17], cs_train[,18],cs_train[,19])
+x <- na.omit(x) #Remember Monthly Income contains NA values
+x_for_ridge <- data.matrix(x[,-1]) #Everything but Response Variable
+ridge_model5 <- cv.glmnet(x_for_ridge,x[,1], alpha = 0, standardize = TRUE, nfolds = length(x))
+ridge_model5
+```
+
+```{r}
+lasso_model5 <- cv.glmnet(x_for_ridge,x[,1], alpha = 1, standardize = TRUE, nfolds = length(x))
+lasso_model5
+```
+
+```{r}
 ```
