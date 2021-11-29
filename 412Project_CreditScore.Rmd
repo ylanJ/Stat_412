@@ -11,6 +11,14 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 library(MASS)
 library(glmnet)
+library(readr)
+library(car)
+library(randomForest)
+library(dplyr)
+library(summarytools)
+library(ggplot2)
+library(ROCR)
+library(caTools)
 ```
 
 ## NA data (Income NA), Minority, Majority Groups
@@ -23,15 +31,11 @@ library(glmnet)
 
 - Q1: do we want NA to be a separate group? based on EDA, might or might not do so
 
+
 ```{r}
 # Read Credit Scoring Data Training Set
 #cs_train <- cs_training
 cs_train = read.csv("cs-training.csv")
-cs_train[1:10,]
-is.na(cs_train[7,]$MonthlyIncome)
-
-
-
 
 # If we want to split NA to another group
 #cs_train_NA <- cs_train[cs_train$MonthlyIncome==NA,]
@@ -39,19 +43,22 @@ is.na(cs_train[7,]$MonthlyIncome)
 
 
 
-## 1. Separate minority data vs majority data vs NA data total 150k
-cs_train_min <- cs_train[cs_train$SeriousDlqin2yrs==1,]  # 10,026 obs
-cs_train_maj <- cs_train[cs_train$SeriousDlqin2yrs==0,]  # 139,974 obs
-
-```
-```{r}
 ## 0. NA Monthly Income
 
 # Add col to indicate whether monthly Income is NA or not
 cs_train$NA_Indicator <- 0  # Set all NA_Indicator to zero
 cs_train$NA_Indicator[is.na(cs_train$MonthlyIncome)] <- 1  # Change NA income indexes to 1
 head(cs_train[cs_train$NA_Indicator==1,])  # Check the ones indicated as NA
+
+
+## 1. Separate minority data vs majority data vs NA data total 150k
+cs_train_min <- cs_train[cs_train$SeriousDlqin2yrs==1,]  # 10,026 obs
+cs_train_maj <- cs_train[cs_train$SeriousDlqin2yrs==0,]  # 139,974 obs
+
+
+
 ```
+
 
 ```{r}
 summary(cs_train)
@@ -105,7 +112,25 @@ train1 <-cs_train[cs_train[,3]< quantile(cs_train[,3],0.95),]
 ```
 
 ```{r}
-cs_train
+head(cs_train)
+```
+
+## Split the data to Testing/Training
+
+```{r}
+
+# Remove NA cases otherwise cannot predict
+raw_data <- cs_train
+cs_train_omit <- na.omit(raw_data)   # 150k -> 120,269 obs
+
+# Sample 60% of data for training Purpose
+n = nrow(cs_train_omit)
+na.idx = raw_data$X[-cs_train_omit$X]  # indexes of data with NA values that we removed
+n.idx = sample(n, n*0.6) # Indexes for test train split
+
+cs_train = cs_train_omit[n.idx,]  # Training data 72,161 obs
+cs_test = cs_train_omit[-n.idx,]  # Testing data  48,108 obs.
+cs_NA = raw_data[na.idx,]  # data with NA value  29,731 obs
 ```
 
 ```{r}
@@ -283,5 +308,151 @@ lasso_model5 <- cv.glmnet(x_for_ridge,x[,1], alpha = 1, standardize = TRUE, nfol
 lasso_model5
 ```
 
+
+### Evaluate Final Model
+
+- mmp plots to see if model fits the data, as well as the pearson Chi-square test
+- checking for outliers and influential points
+- Some measure of pesudo R-square and accuracy of the model
+- Use confusion matrix, ROC/AUC curve, AIC to evaluate the different models
+
+
+
 ```{r}
+# Split x and y variables
+train.x = cs_train[,-which(names(cs_train) == "SeriousDlqin2yrs")]
+train.y = cs_train$SeriousDlqin2yrs
+test.x = cs_test[,-which(names(cs_test) == "SeriousDlqin2yrs")]
+test.y = cs_test$SeriousDlqin2yrs
+```
+
+### Model after recoding Random Forest
+
+```{r}
+# Fits Random Forest
+model.rf = randomForest(y = as.factor(train.y), x=train.x, xtest=test.x, ytest=as.factor(test.y), mtry = 3, importance = TRUE, na.action = na.omit)
+
+model.rf # Output shows confusion matrix for both train and test
+
+# Random Forest Output
+var.imp = data.frame(importance(model.rf, type=2))
+var.imp$Variables = row.names(var.imp)
+varimp = var.imp[order(var.imp$MeanDecreaseGini,decreasing = T),]
+par(mar = c(7.5,3,2,2)) 
+giniplot = barplot(t(varimp[-2]/sum(varimp[-2])),las=2,cex.names=1, main="Gini Impurity Index Plot")
+```
+
+
+### Evaluation on Final Model using Training Data
+
+
+```{r}
+## Set model as final model
+model.final <- model
+
+## Evaluation on Final model using Training Data
+train_preds = predict(model.final, newdata=train.x, type="response")
+head(train_preds[is.na(train_preds)])
+
+#train.x[c(7,9),]
+#train_preds[is.na(train_preds)]
+
+pred_compare = prediction(train_preds, train.y)
+plot(performance(pred_compare, "acc"))
+table(train.y, train_preds>0.2) # accurary on train
+```
+
+
+
+## Evaluating Model/Comparing results, Plots, Tests, chi-square test, influential points
+# Need to Update!!
+
+```{r}
+# residual plots
+#residualPlots(model.final)
+
+# Marginial Model Plots
+library(car)
+mmp(model.final)
+```
+####  Goodness of Fit using Hosmer-Lemeshow Test
+
+The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
+
+```{r}
+# Goodness of Fit using Hosmer-Lemeshow Test
+linpred=predict(model.final)
+
+cs_train_m <- mutate(cs_train, predprob=predict(model.final, type="response"))  # cal p^_i
+gdf <- group_by(cs_train_m, ntile(linpred, 1000)) # group up the data by eta_x into 100 groups
+hldf <- summarise(gdf, y=sum(SeriousDlqin2yrs==1), ppred=mean(predprob), count=n())
+head(hldf)
+
+
+# We adjust the size of the bins until there's only one group with less than 5
+hldf[hldf$count<5,]
+
+# Observed Proportion Confidence Interval vs Predicted Probability
+hldf <- mutate(hldf, se.fit=sqrt(ppred*(1-ppred)/count))
+
+ggplot(hldf,aes(x=ppred,y=y/count,ymin=y/count-2*se.fit, ymax=y/count+2*se.fit))+
+  geom_point()+geom_linerange(color=grey(0.75))+
+  geom_abline(intercept = 0,slope = 1)+
+  xlab("Predicted Probability")+
+  ylab("Observed Proportion")
+
+# Hosmer-Lemeshow statistics
+hlstat <- with(hldf, sum((y-count*ppred) ^2/(count * ppred * (1-ppred))))
+c(hlstat, nrow(hldf))
+
+# The p-value is given by:
+1-pchisq(hlstat, nrow(hldf)-2)
+
+```
+### AUC
+## Need to fix the Prediction function!!!
+Predict -> Currently gives 120k, expecting 80k
+
+```{r}
+
+#Final Model(w/ interaction term ReugularMedicine * PhysicallyActive)
+result_m2 = predict(model.final, newdata=test.x, type="response") 
+
+# Fix Later!!! Forced the length to be the same
+result_m2 <- result_m2[1:length(test.y)]
+head(test.y)
+pred_m2 = prediction(result_m2, test.y)
+
+
+plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
+table(test.y, result_m2>0.2)
+
+
+#Accuracy :
+#Sensitivity : 
+#Specificity : 
+#The Specificity and accuracy improved a bit compared to the previous model without interaction term, sensitivity decreased a bit but still at a very high level.
+plot(performance(pred_m2,"tpr","fpr"), colorize=T)
+abline(0,1)
+
+#Now we calculate the area under the curve (AUC) and accuracy of the model given above (glmModel2)
+auc_ROCR2 <- performance(pred_m2, measure = "auc")
+auc_ROCR2@y.values[[1]]
+```
+
+### Not Sure if we use this!!
+
+```{r}
+
+# Check how the model fits the data
+# From model.final, we can calculate the difference in the two deviances from the summary(model): 987.27-513.52=473.75
+#Number of regressors in the model: 813-802=11
+pchisq(473.75,12)
+
+#The area below 473.75 is one which means the area above it is almost zero. This means that our model has less error than intercept only model and explains some of the variance in the outcome variable.
+print(paste("Pearson's X^2 =",round(sum(residuals(model.final,type="pearson")^2),3)))
+
+
+qchisq(0.95,802)
+#781.61<868.99, so we fail to reject the null hypothesis and conclude that the logistic model fits the data.
 ```
