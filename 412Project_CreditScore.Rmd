@@ -36,6 +36,7 @@ library(caTools)
 # Read Credit Scoring Data Training Set
 #cs_train <- cs_training
 cs_train = read.csv("cs-training.csv")
+train <- cs_train
 
 # If we want to split NA to another group
 #cs_train_NA <- cs_train[cs_train$MonthlyIncome==NA,]
@@ -187,12 +188,12 @@ tapply(train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, media
 #Remove outliers; maybe only keep anything greater than 10
 tapply(train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, mean) #d
 tapply(train$age, train$SeriousDlqin2yrs, median) #median age of 45 for people defaulting
-tapply(train$`NumberOfTime30-59DaysPastDueNotWorse`, train$SeriousDlqin2yrs, mean) #2.4 times for those with delinquency incidence
+#tapply(train$`NumberOfTime30-59DaysPastDueNotWorse`, train$SeriousDlqin2yrs, mean) #2.4 times for those with delinquency incidence
 tapply(train$NumberOfTimes90DaysLate, train$SeriousDlqin2yrs, mean) #2.1 times for those with delinquency incidence vs 0.13 for no delinquency
 tapply(train$DebtRatio, train$SeriousDlqin2yrs, median) #0.43 for delinquency incidence vs 0.36 for non delinquency
-tapply(train$NumIncome, train$SeriousDlqin2yrs, median) #delinquency monthly income of $3.8K vs $4.4K for those without delinquency
+#tapply(train$NumIncome, train$SeriousDlqin2yrs, median) #delinquency monthly income of $3.8K vs $4.4K for those without delinquency
 tapply(train$NumberOfTimes90DaysLate, train$SeriousDlqin2yrs, mean)
-summary(train$NumIncome)
+#summary(train$NumIncome)
 
 
 
