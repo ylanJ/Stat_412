@@ -3,7 +3,9 @@ title: "Stat 412"
 author: "Yolanda Jin"
 date: "24/11/2021"
 output:
-  pdf_document: default
+  pdf_document:
+    toc: true
+    toc_depth: 3
   html_document: default
 ---
 
@@ -19,60 +21,40 @@ library(summarytools)
 library(ggplot2)
 library(ROCR)
 library(caTools)
+
+#number_sections: true
 ```
 
-## NA data (Income NA), Minority, Majority Groups
+## 0. Cleaning Up Data and Creating Data Groups
 
-- Added column for NA_indicator
+### a) Remove NA Data
 
-- split groups to minority vs majority group
+- Split out data with NA in any predictors
 
+- split non-NA group to minority (default) vs majority (non-default) group
 
-
-- Q1: do we want NA to be a separate group? based on EDA, might or might not do so
-
+- Additional TODO: can check out characteristics of NA group so we can replace the NA values
 
 ```{r}
 # Read Credit Scoring Data Training Set
 #cs_train <- cs_training
 cs_train = read.csv("cs-training.csv")
 train <- cs_train
-raw_data <- cs_train
-cs_train_omit <- na.omit(raw_data)
-Predictor_Variables <- subset.data.frame(cs_train_omit, select = c(RevolvingUtilizationOfUnsecuredLines:NumberOfDependents
-))
-# If we want to split NA to another group
-#cs_train_NA <- cs_train[cs_train$MonthlyIncome==NA,]
-#head(cs_train_NA)
-
-
-## 0. NA Monthly Income
-
-# Add col to indicate whether monthly Income is NA or not
-cs_train$NA_Indicator <- 0  # Set all NA_Indicator to zero
-cs_train$NA_Indicator[is.na(cs_train$MonthlyIncome)] <- 1  # Change NA income indexes to 1
-head(cs_train[cs_train$NA_Indicator==1,])  # Check the ones indicated as NA
-
-
-## 1. Separate minority data vs majority data vs NA data total 150k
-cs_train_min <- cs_train[cs_train$SeriousDlqin2yrs==1,]  # 10,026 obs
-cs_train_maj <- cs_train[cs_train$SeriousDlqin2yrs==0,]  # 139,974 obs
-
-
-
-```
-
-```{r}
-summary(cs_train)
-```
-## Split the data to Testing/Training
-```{r}
+raw_data <- cs_train    #150k rows
 
 # Remove NA cases otherwise cannot predict
-#raw_data <- cs_train
-cs_train_omit <- na.omit(raw_data)   # 150k -> 120,269 obs
+cs_train_omit <- na.omit(raw_data)  # 150k -> 120,269 obs
+Predictor_Variables <- subset.data.frame(cs_train_omit, select = c(RevolvingUtilizationOfUnsecuredLines:NumberOfDependents
+))
 
+summary(cs_train)
+```
+
+### b) Split the data to Testing/Training &  Minority, Majority Groups
+
+```{r}
 # Sample 60% of data for training Purpose
+set.seed(1)
 n = nrow(cs_train_omit)
 na.idx = raw_data$X[-cs_train_omit$X]  # indexes of data with NA values that we removed
 n.idx = sample(n, n*0.6) # Indexes for test train split
@@ -80,6 +62,15 @@ n.idx = sample(n, n*0.6) # Indexes for test train split
 cs_train = cs_train_omit[n.idx,]  # Training data 72,161 obs
 cs_test = cs_train_omit[-n.idx,]  # Testing data  48,108 obs.
 cs_NA = raw_data[na.idx,]  # data with NA value  29,731 obs
+
+
+## 1. Separate minority data vs majority data vs NA data total 72,161 obs
+cs_train_min <- cs_train[cs_train$SeriousDlqin2yrs==1,]  # (omit) 10,026 -> (training) 5,009 obs
+cs_train_maj <- cs_train[cs_train$SeriousDlqin2yrs==0,]  # (omit) 139,974 -> (training) 67,152 obs
+
+str(cs_train)
+str(cs_train_min)
+str(cs_train_maj)
 ```
 
 ```{r}
@@ -107,6 +98,9 @@ hist(cs_train[,11])#NumberOfTime60.89DaysPastDueNotWorse
 hist(cs_train[,12])#NumberOfDependents`   ``
 
 ```
+
+
+### Creating Indicator Variables for Extreme Data
 
 ```{r}
 Jimmys_Bad_Variables <- cs_train
@@ -147,58 +141,18 @@ train1 <-Jimmys_Bad_Variables[Jimmys_Bad_Variables[,3]< quantile(Jimmys_Bad_Vari
 head(Jimmys_Bad_Variables)
 Just_Bad_Variables <- subset.data.frame(Jimmys_Bad_Variables, select = c(X,SeriousDlqin2yrs, age, HighRevolving:Many_TwoToThreeMonthsLate,Many_Dependents ))
 ```
-##PCA using all 22 variables
-```{r}
-pca_including_dummy_variables <- prcomp(na.omit(Jimmys_Bad_Variables[,-c(which(names(Jimmys_Bad_Variables) == "SeriousDlqin2yrs"), which(names(Jimmys_Bad_Variables) == "X"))]))
-```
-
-```{r}
-summary(pca_including_dummy_variables) #First PC has like 99.66% of variance
-pca_including_dummy_variables$rotation[,1] #I think it really likes Monthly Income as it's close to 1. Then there's two groups of variables that hover around e-04-06 and then e-10-11. Dummy variable for Monthly Income(Rich) is not useful.
-```
-```{r}
-glm_pca_including_dummy_variables <- glm(train.y ~ pca_including_dummy_variables$x[,1], family = "binomial")
-summary(glm_pca_including_dummy_variables)
-```
-##PCA using original 10 variables
-```{r}
-pca_original_data <- prcomp(train.x)
-```
-
-```{r}
-summary(pca_original_data) #PC1 has 99.66% variance explained
-pca_original_data$rotation[,1] #It also really likes MonthlyIncome and not anything else
-```
-```{r}
-glm_pca_original_data <- glm(train.y ~ pca_original_data$x[,1], family = "binomial")
-summary(glm_pca_original_data)
-```
-
-##PCA Using Dummy variables
-```{r}
-pca_dummy <- prcomp(Just_Bad_Variables[,-c(which(names(Just_Bad_Variables) == "SeriousDlqin2yrs"), which(names(Just_Bad_Variables) == "X"))])
-```
-
-```{r}
-summary(pca_dummy) #PC 1 is 100%?
-pca_dummy$rotation[,1] #Age is significant
-```
-```{r}
-glm_pca_dummy <- glm(train.y ~ pca_dummy$x[,1], family = "binomial")
-summary(glm_pca_dummy)
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
 
 
 
-## EDA
+## 1. Question/Goal
+
+- Comparing our model performance against paper's model
+
+- Most important factors
+
+
+
+## 2. EDA (Still need to Clean up for better graphs)
 
 - monthly income = 0
 
@@ -243,27 +197,10 @@ tapply(cs_train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, me
  #tapply(train$NumIncome, train$SeriousDlqin2yrs, median) #delinquency monthly income of $3.8K vs $4.4K for those without delinquency
  tapply(train$NumberOfTimes90DaysLate, train$SeriousDlqin2yrs, mean)
  #summary(train$NumIncome)
-
-
-
-
 ```
 
-## Question/Goal
 
-- Comparing our model performance against paper's model
-
-- Most important factors
-
-
-## Ensemble Learning
-
-- Lasso Ensemble Algorithm
-
-- Aggregating base learner: Weighted base=learner
-
-
-## Balancing Data
+## 3. Balancing Data (Creating New Datasets)
 
 - Use clustering and pick one sub-group from majority
   - can try Age/Income
@@ -274,31 +211,9 @@ tapply(cs_train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, me
 - Use NA indicator 0 or 1 (maybe use mean/median)
 
 
-```{r}
-# Cluster Grouping Majority Data (Try to cluster data by age/monthly income)
-set.seed(1) # for reproducibility
+### a) Boostrapping Minority Data (cs_train_min_add) (1000 obs)
 
-head(cs_train_maj)
-
-# Test with smaller group based on monthly income range
-cs_train_maj_g1 <- cs_train_maj[cs_train_maj$NA_Indicator==0,] # Filter out NA monthly income first
-cs_train_maj_g1 <- cs_train_maj_g1[cs_train_maj_g1$MonthlyIncome<20000,]  #38035 obs
-head(cs_train_maj_g1)
-
-```
-
-```{r}
-# Create a dat with the two predictors of interest
-dat <- cs_train_maj_g1[,c(4,7)]  # Age and MonthlyIncome
-head(dat)
-
-n_maj <- nrow(dat) # get number of rows
-
-# Initial assignments to three groups that will need to update
-assignments <- factor(sample(c(1,2,3), n_maj, replace = TRUE))
-#plot(dat, col=assignments, xlim = c(0,110), asp=1)
-#plot(dat, col=assignments)
-```
+- Currently created 1000 additional data, can add more
 
 ```{r}
 # Boostrapping Minority Data
@@ -309,6 +224,7 @@ n_add <- 1000
 n_min <- nrow(cs_train_min)
 n_min
 index <- sample(n_min, n_add, replace = TRUE)
+
 #plot(density(index),  main="")  # show density curve of the index we randomized
 hist(index, breaks = 100)
 min(index)
@@ -319,39 +235,74 @@ length(index)
 cs_train_min_add <- cs_train_min[index,]
 head(cs_train_min_add)
 ```
+
+### b) Resampling Majority Data (new_train.final 1 & 2)
+
+- Method 1: use Full omit Data to sample majority data (new_train.final1) (8357*2)
+
+- Method 2: use Training Data to sample majority data (new_train.final2) (4941*2)
+
 ```{r}
 ###SHELLY -  Balance Response Variable
  set.seed(2) # for reproducibility
- raw_data <- cs_train #150k rows
- cs_train_omit <- na.omit(raw_data)   # 150k -> 120,269 obs
+
+
+## Method 1: Balance Full omit Data (new_train.final1)
  new_train <- filter(cs_train_omit, cs_train_omit$SeriousDlqin2yrs == 0) #112k rows
 
  #Check Response Variable Balance in cs_train_omit data
  table(cs_train_omit$SeriousDlqin2yrs) #8,357 1's
 
-
- new_train2 <- new_train[sample(1:nrow(new_train)),] #112k rows
- new_train3 <- new_train2[1:8357,]
+ n_add <- sum(cs_train_omit$SeriousDlqin2yrs ==1)  # Number of Default
+ n_add
+ 
+ new_train2 <- new_train[sample(1:nrow(new_train)),] #112k rows without replacement
+ new_train3 <- new_train2[1:n_add,]
 
  #######**Merge Data Together (use new_train5 variable)
  new_train4 <- filter(cs_train_omit, cs_train_omit$SeriousDlqin2yrs == 1)
  #nrow(new_train4)
- new_train5 <- rbind(new_train3, new_train4)
- nrow(new_train5) #16,714 rows as there should be (8357*2)
- table(new_train5$SeriousDlqin2yrs) #correct; equal # of 0's and 1's
+ new_train.final1 <- rbind(new_train3, new_train4)
+ nrow(new_train.final1) #16,714 rows as there should be (8357*2)
+ table(new_train.final1$SeriousDlqin2yrs) #correct; equal # of 0's and 1's
+ 
+ 
+## Method 2: Balance Training Data (new_train.final2)
+  
+  #Check Response Variable Balance in cs_train_omit data
+  table(cs_train$SeriousDlqin2yrs) #0: 67220  1: 4941 
+
+  n_add <- nrow(cs_train_min) # Number of Default
+  
+ # Randomly Sample data from Non-Default group (sample = min group obs#)
+ new_train <- cs_train_maj[sample(1:nrow(cs_train_maj),n_add, replace=FALSE),] #67220 rows without replacement
+
+ #######**Merge Data Together (use new_train.final2 variable)
+ new_train.final2 <- rbind(new_train, cs_train_min)
+ nrow(new_train.final2) #10k rows as there should be (4941*2)
+ table(new_train.final2$SeriousDlqin2yrs) #correct; equal # of 0's and 1's
+ 
 ```
-##Split into Training and Testing
+
+### c) Using Clustering to select from Majority Group
+
+Select one cluster from majority group and combine with minority group data to form new Balanced Training Data
+
+```{r}
+training_dataset <- data.frame(train.x, train.y)
+kmeans_model_train  <- kmeans(training_dataset, centers = 5) # centers because paper had 5 clusters
+kmeans_model_train$centers #what each cluster's average values are for each variable. The most obvious clustering is by income
+#Cluster 3 and 4 are different than Cluster 1 and 2 in terms of the Response Variable.
+```
+
+```{r}
+testing_data <- data.frame(test.x,test.y)
+kmeans_model_test  <- kmeans(testing_data, centers = 5) #testing to see if test data has similar clusters as training data and it looks to be true. this means we can perhaps predict response variable of test data using training data
+kmeans_model_test$centers #Clusters are grouped as (1,2), (3,5) and (4) for Response Variables.
+```
 
 
-
-
-
-
-
-
-
-
-## Which models to try
+## 4. Applying Different Methods (with and without Balanced Data)
 
 - Logistic regression (compare the different link functions)
 
@@ -359,13 +310,77 @@ head(cs_train_min_add)
 
 - RF
 
-## Evaluating Model/Comparing results
-
-- AUC
 
 
+### Method 1: PCA
+
+### 1-a) PCA with Unbalanced Data
+
+### PCA using all 22 variables
 
 ```{r}
+pca_including_dummy_variables <- prcomp(na.omit(Jimmys_Bad_Variables[,-c(which(names(Jimmys_Bad_Variables) == "SeriousDlqin2yrs"), which(names(Jimmys_Bad_Variables) == "X"))]))
+```
+
+```{r}
+summary(pca_including_dummy_variables) #First PC has like 99.66% of variance
+pca_including_dummy_variables$rotation[,1] #I think it really likes Monthly Income as it's close to 1. Then there's two groups of variables that hover around e-04-06 and then e-10-11. Dummy variable for Monthly Income(Rich) is not useful.
+```
+```{r}
+glm_pca_including_dummy_variables <- glm(train.y ~ pca_including_dummy_variables$x[,1], family = "binomial")
+summary(glm_pca_including_dummy_variables)
+```
+
+### PCA using original 10 variables
+
+```{r}
+pca_original_data <- prcomp(train.x)
+```
+
+```{r}
+summary(pca_original_data) #PC1 has 99.66% variance explained
+pca_original_data$rotation[,1] #It also really likes MonthlyIncome and not anything else
+```
+```{r}
+glm_pca_original_data <- glm(train.y ~ pca_original_data$x[,1], family = "binomial")
+summary(glm_pca_original_data)
+```
+
+### PCA Using Dummy variables
+
+```{r}
+pca_dummy <- prcomp(Just_Bad_Variables[,-c(which(names(Just_Bad_Variables) == "SeriousDlqin2yrs"), which(names(Just_Bad_Variables) == "X"))])
+```
+
+```{r}
+summary(pca_dummy) #PC 1 is 100%?
+pca_dummy$rotation[,1] #Age is significant
+```
+```{r}
+glm_pca_dummy <- glm(train.y ~ pca_dummy$x[,1], family = "binomial")
+summary(glm_pca_dummy)
+```
+
+
+### 1 b) PCA with Balanced Data
+
+```{r}
+
+```
+
+
+
+### Method 2: Using GLM Original Predictors vs Extreme Binned Predictors + MonthlyIncome
+
+We compared GLM original Predictors with extreme binned predictors using unbalanced data and see better performance in original numeric predictors.
+
+We now try to improve the model using balanced data.
+
+### 2 a) GLM Original Predictors with Unbalanced Data
+
+```{r}
+## Orignial Predictors
+
 model <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ Jimmys_Bad_Variables[,3] +Jimmys_Bad_Variables[,4] +Jimmys_Bad_Variables[,5] +Jimmys_Bad_Variables[,6] +Jimmys_Bad_Variables[,7] +Jimmys_Bad_Variables[,8] +Jimmys_Bad_Variables[,9] +Jimmys_Bad_Variables[,10] +Jimmys_Bad_Variables[,11] +Jimmys_Bad_Variables[,12], family = "binomial", data = Jimmys_Bad_Variables) 
 #To Change family link use family = quasi(variance = "mu^3", link = "log") change quasi
 summary(model)
@@ -374,6 +389,10 @@ plot(model, which = 1) #Outliers skew residuals plot
 ```{r}
 stepAIC(model)
 ```
+
+
+### 2 b) GLM Extreme Binned Predictors with Unbalanced Data
+
 ```{r}
 model2 <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ MonthlyIncome + Jimmys_Bad_Variables[,13] + Jimmys_Bad_Variables[,14] + Jimmys_Bad_Variables[,15] + Jimmys_Bad_Variables[,16] + Jimmys_Bad_Variables[,17] + Jimmys_Bad_Variables[,18] + Jimmys_Bad_Variables[,19] + Jimmys_Bad_Variables[,20] + Jimmys_Bad_Variables[,22], family = "binomial", data = Jimmys_Bad_Variables)
 model2
@@ -402,6 +421,18 @@ anova(model,model2,model3,model4,model5) #model 2 is the one with NA values
 #model 1 is the best but we can check model 5 using our dummy variables
 ```
 
+
+### 2 c) GLM Original Predictors with Balanced Data
+
+```{r}
+
+```
+
+
+### Method 3: Ridge
+
+### 3 a) Ridge with Unbalanced Data
+
 ```{r}
 x <- data.frame(Jimmys_Bad_Variables$SeriousDlqin2yrs, Jimmys_Bad_Variables$MonthlyIncome, Jimmys_Bad_Variables[,15],Jimmys_Bad_Variables[,16],Jimmys_Bad_Variables[,17], Jimmys_Bad_Variables[,18],Jimmys_Bad_Variables[,19])
 x <- na.omit(x) #Remember Monthly Income contains NA values
@@ -410,25 +441,27 @@ ridge_model5 <- cv.glmnet(x_for_ridge,x[,1], alpha = 0, standardize = TRUE, nfol
 ridge_model5
 ```
 
+### 3 b) Ridge with Balanced Data
+
+### Method 4: Lasso
+
+### 4 a) Lasso with Unbalanced Data
+
 ```{r}
 lasso_model5 <- cv.glmnet(x_for_ridge,x[,1], alpha = 1, standardize = TRUE, nfolds = length(x))
 lasso_model5
 ```
 
+### 4 b) Lasso with Balanced Data
 
-### Evaluate Final Model
+```{r}
 
-- mmp plots to see if model fits the data, as well as the pearson Chi-square test
-- checking for outliers and influential points
-- Some measure of pesudo R-square and accuracy of the model
-- Use confusion matrix, ROC/AUC curve, AIC to evaluate the different models
+```
 
 
+### Method 4: Random Forest
 
-
-
-### Model after recoding Random Forest
-
+### 4 a) Random Forest with Unbalanced Data
 ```{r}
 # Fits Random Forest
 model.rf = randomForest(y = as.factor(train.y), x=train.x, xtest=test.x, ytest=as.factor(test.y), mtry = 3, importance = TRUE, na.action = na.omit)
@@ -444,7 +477,23 @@ giniplot = barplot(t(varimp[-2]/sum(varimp[-2])),las=2,cex.names=1, main="Gini I
 ```
 
 
-### Evaluation on Final Model using Training Data
+### 4 b) Random Forest with Balanced Data
+
+```{r}
+
+```
+
+
+## 5. Evaluating Model/Comparing results
+
+- mmp plots to see if model fits the data, as well as the pearson Chi-square test
+- checking for outliers and influential points
+- Some measure of pesudo R-square and accuracy of the model
+- Use confusion matrix, ROC/AUC curve, AIC to evaluate the different models
+
+
+
+### 5-1 Evaluation on Final Model using Training Data
 
 
 ```{r}
@@ -465,7 +514,7 @@ table(train.y, train_preds>0.2) # accurary on train
 
 
 
-## Evaluating Model/Comparing results, Plots, Tests, chi-square test, influential points
+### 5-2 Marginal Model Plots
 # Need to Update!!
 
 ```{r}
@@ -476,7 +525,9 @@ table(train.y, train_preds>0.2) # accurary on train
 library(car)
 mmp(model.final)
 ```
-####  Goodness of Fit using Hosmer-Lemeshow Test
+
+
+###  5-3 Goodness of Fit using Hosmer-Lemeshow Test
 
 The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
 
@@ -510,7 +561,9 @@ c(hlstat, nrow(hldf))
 1-pchisq(hlstat, nrow(hldf)-2)
 
 ```
+
 ### AUC
+
 ## Need to fix the Prediction function!!!
 Predict -> Currently gives 120k, expecting 80k
 
@@ -541,39 +594,6 @@ auc_ROCR2 <- performance(pred_m2, measure = "auc")
 auc_ROCR2@y.values[[1]]
 ```
 
-### Not Sure if we use this!!
-
-```{r}
-
-# Check how the model fits the data
-# From model.final, we can calculate the difference in the two deviances from the summary(model): 987.27-513.52=473.75
-#Number of regressors in the model: 813-802=11
-pchisq(473.75,12)
-
-#The area below 473.75 is one which means the area above it is almost zero. This means that our model has less error than intercept only model and explains some of the variance in the outcome variable.
-print(paste("Pearson's X^2 =",round(sum(residuals(model.final,type="pearson")^2),3)))
-
-
-qchisq(0.95,802)
-#781.61<868.99, so we fail to reject the null hypothesis and conclude that the logistic model fits the data.
-```
-```{r}
-sum(cs_train[,2])
-sum(cs_test[,2])
-```
-
-```{r}
-training_dataset <- data.frame(train.x, train.y)
-kmeans_model_train  <- kmeans(training_dataset, centers = 5) # centers because paper had 5 clusters
-kmeans_model_train$centers #what each cluster's average values are for each variable. The most obvious clustering is by income
-#Cluster 3 and 4 are different than Cluster 1 and 2 in terms of the Response Variable.
-```
-
-```{r}
-testing_data <- data.frame(test.x,test.y)
-kmeans_model_test  <- kmeans(testing_data, centers = 5) #testing to see if test data has similar clusters as training data and it looks to be true. this means we can perhaps predict response variable of test data using training data
-kmeans_model_test$centers #Clusters are grouped as (1,2), (3,5) and (4) for Response Variables.
-```
 
 ```{r}
 #predict(kmeans_model_train, newdata=test.x, type="response")
@@ -609,6 +629,68 @@ pca_auc_ROCR2@y.values[[1]]
 
 ```
 
+
+## Maybe don't need session ##################################################################
+
+
+### (0) Ensemble Learning Used by Paper
+
+- Lasso Ensemble Algorithm
+
+- Aggregating base learner: Weighted base=learner
+
+
+### Not Sure if we use this!!
+
+```{r}
+
+# Check how the model fits the data
+# From model.final, we can calculate the difference in the two deviances from the summary(model): 987.27-513.52=473.75
+#Number of regressors in the model: 813-802=11
+pchisq(473.75,12)
+
+#The area below 473.75 is one which means the area above it is almost zero. This means that our model has less error than intercept only model and explains some of the variance in the outcome variable.
+print(paste("Pearson's X^2 =",round(sum(residuals(model.final,type="pearson")^2),3)))
+
+
+qchisq(0.95,802)
+#781.61<868.99, so we fail to reject the null hypothesis and conclude that the logistic model fits the data.
+```
+```{r}
+sum(cs_train[,2])
+sum(cs_test[,2])
+```
+
+
+
+### Cluster Attempt
+
+```{r}
+# Cluster Grouping Majority Data (Try to cluster data by age/monthly income)
+set.seed(1) # for reproducibility
+
+head(cs_train_maj)
+
+# Test with smaller group based on monthly income range
+cs_train_maj_g1 <- cs_train_maj[cs_train_maj$NA_Indicator==0,] # Filter out NA monthly income first
+cs_train_maj_g1 <- cs_train_maj_g1[cs_train_maj_g1$MonthlyIncome<20000,]  #38035 obs
+head(cs_train_maj_g1)
+
+```
+
+```{r}
+# Create a dat with the two predictors of interest
+dat <- cs_train_maj_g1[,c(4,7)]  # Age and MonthlyIncome
+head(dat)
+
+n_maj <- nrow(dat) # get number of rows
+
+# Initial assignments to three groups that will need to update
+assignments <- factor(sample(c(1,2,3), n_maj, replace = TRUE))
+#plot(dat, col=assignments, xlim = c(0,110), asp=1)
+#plot(dat, col=assignments)
+```
+### Maybe don't need session (END) ####
 ```{r}
 
 ```
