@@ -37,11 +37,13 @@ library(caTools)
 #cs_train <- cs_training
 cs_train = read.csv("cs-training.csv")
 train <- cs_train
-
+raw_data <- cs_train
+cs_train_omit <- na.omit(raw_data)
+Predictor_Variables <- subset.data.frame(cs_train_omit, select = c(RevolvingUtilizationOfUnsecuredLines:NumberOfDependents
+))
 # If we want to split NA to another group
 #cs_train_NA <- cs_train[cs_train$MonthlyIncome==NA,]
 #head(cs_train_NA)
-
 
 
 ## 0. NA Monthly Income
@@ -60,68 +62,14 @@ cs_train_maj <- cs_train[cs_train$SeriousDlqin2yrs==0,]  # 139,974 obs
 
 ```
 
-
 ```{r}
 summary(cs_train)
 ```
-```{r}
-
-hist(cs_train[,2]) #Response Variable
-hist(cs_train[,3]) #RevolvingUtilizationOfUnsecuredLines
-hist(cs_train[,4]) #age
-hist(cs_train[,5]) #NumberOfTime30.59DaysPastDueNotWorse
-hist(cs_train[,6]) #DebtRatio
-hist(cs_train[,7]) #MonthlyIncome
-hist(cs_train[,8]) #NumberOfOpenCreditLinesAndLoans
-hist(cs_train[,9]) #NumberOfTimes90DaysLate
-hist(cs_train[,10])#NumberRealEstateLoansOrLines
-hist(cs_train[,11])#NumberOfTime60.89DaysPastDueNotWorse
-hist(cs_train[,12])#NumberOfDependents
-hist(cs_train[,13])#NA_Indicator
-
-```
-
-```{r}
-cs_train$HighRevolving <- 0
-cs_train$HighRevolving[quantile(cs_train[,3],0.95)] <- 1
-
-cs_train$Many_LessThan2MonthsLate <- 0
-cs_train$Many_LessThan2MonthsLate[quantile(cs_train[,5],0.95)] <- 1
-
-cs_train$HighDebtRatio <- 0 
-cs_train$HighDebtRatio[quantile(cs_train[,6],0.95)] <- 1
-
-cs_train$Many_CurrentLoans <- 0
-cs_train$Many_CurrentLoans[quantile(cs_train[,8],0.95)] <- 1
-
-cs_train$Many_AtLeastThreeMonthsLate <- 0
-cs_train$Many_AtLeastThreeMonthsLate[quantile(cs_train[,9],0.95)] <- 1
-
-cs_train$Many_HouseLoans <- 0
-cs_train$Many_HouseLoans[quantile(cs_train[,10],0.95)] <- 1
-
-cs_train$Many_TwoToThreeMonthsLate <- 0
-cs_train$Many_TwoToThreeMonthsLate[quantile(cs_train[,11],0.95)] <- 1
-
-cs_train$NA_Dependents_are_Mean <- cs_train[,12] #Need to Change NA values to Mean before sorting through quantiles.
-cs_train$NA_Dependents_are_Mean[is.na(cs_train[,12])] <- mean(cs_train[,12], na.rm = TRUE)
-cs_train$Many_Dependents <- 0
-cs_train$Many_Dependents[quantile(cs_train$NA_Dependents_are_Mean,0.95)] <- 1
-
-train1 <-cs_train[cs_train[,3]< quantile(cs_train[,3],0.95),]
-
-```
-
-```{r}
-head(cs_train)
-```
-
 ## Split the data to Testing/Training
-
 ```{r}
 
 # Remove NA cases otherwise cannot predict
-raw_data <- cs_train
+#raw_data <- cs_train
 cs_train_omit <- na.omit(raw_data)   # 150k -> 120,269 obs
 
 # Sample 60% of data for training Purpose
@@ -135,8 +83,109 @@ cs_NA = raw_data[na.idx,]  # data with NA value  29,731 obs
 ```
 
 ```{r}
-train2 <- train1[train1[,5]< quantile(train1[,5],0.99),]
-hist(train1[,3]) #Do we make transformation for predictors? Not Normal Distribution
+# Split x and y variables
+train.x = cs_train[,-which(names(cs_train) == "SeriousDlqin2yrs")]
+train.x = cs_train[,-c(which(names(cs_train) == "SeriousDlqin2yrs"), which(names(cs_train) == "X"), which(names(cs_train)== "NA_Indicator"))]
+train.y = cs_train$SeriousDlqin2yrs
+test.x = cs_test[,-which(names(cs_test) == "SeriousDlqin2yrs")]
+test.x = cs_test[,-c(which(names(cs_test) == "SeriousDlqin2yrs"), which(names(cs_test) == "X"))]
+test.y = cs_test$SeriousDlqin2yrs
+```
+
+```{r}
+
+hist(cs_train[,2]) #Response Variable
+hist(cs_train[,3]) #RevolvingUtilizationOfUnsecuredLines
+hist(cs_train[,4]) #age
+hist(cs_train[,5]) #NumberOfTime30.59DaysPastDueNotWorse
+hist(cs_train[,6]) #DebtRatio
+hist(cs_train[,7]) #MonthlyIncome
+hist(cs_train[,8]) #NumberOfOpenCreditLinesAndLoans
+hist(cs_train[,9]) #NumberOfTimes90DaysLate
+hist(cs_train[,10])#NumberRealEstateLoansOrLines
+hist(cs_train[,11])#NumberOfTime60.89DaysPastDueNotWorse
+hist(cs_train[,12])#NumberOfDependents`   ``
+
+```
+
+```{r}
+Jimmys_Bad_Variables <- cs_train
+Jimmys_Bad_Variables$HighRevolving <- 0
+Jimmys_Bad_Variables$HighRevolving[quantile(Jimmys_Bad_Variables[,3],0.95)] <- 1
+
+Jimmys_Bad_Variables$Many_LessThan2MonthsLate <- 0
+Jimmys_Bad_Variables$Many_LessThan2MonthsLate[quantile(Jimmys_Bad_Variables[,5],0.95)] <- 1
+
+Jimmys_Bad_Variables$HighDebtRatio <- 0 
+Jimmys_Bad_Variables$HighDebtRatio[quantile(Jimmys_Bad_Variables[,6],0.95)] <- 1
+
+Jimmys_Bad_Variables$Rich <- 0
+Jimmys_Bad_Variables$Rich[quantile(Jimmys_Bad_Variables[,6],0.95)] <- 1
+
+Jimmys_Bad_Variables$Many_CurrentLoans <- 0
+Jimmys_Bad_Variables$Many_CurrentLoans[quantile(Jimmys_Bad_Variables[,8],0.95)] <- 1
+
+Jimmys_Bad_Variables$Many_AtLeastThreeMonthsLate <- 0
+Jimmys_Bad_Variables$Many_AtLeastThreeMonthsLate[quantile(Jimmys_Bad_Variables[,9],0.95)] <- 1
+
+Jimmys_Bad_Variables$Many_HouseLoans <- 0
+Jimmys_Bad_Variables$Many_HouseLoans[quantile(Jimmys_Bad_Variables[,10],0.95)] <- 1
+
+Jimmys_Bad_Variables$Many_TwoToThreeMonthsLate <- 0
+Jimmys_Bad_Variables$Many_TwoToThreeMonthsLate[quantile(Jimmys_Bad_Variables[,11],0.95)] <- 1
+
+Jimmys_Bad_Variables$NA_Dependents_are_Mean <- Jimmys_Bad_Variables[,12] #Need to Change NA values to Mean before sorting through quantiles.
+Jimmys_Bad_Variables$NA_Dependents_are_Mean[is.na(Jimmys_Bad_Variables[,12])] <- mean(Jimmys_Bad_Variables[,12], na.rm = TRUE)
+Jimmys_Bad_Variables$Many_Dependents <- 0
+Jimmys_Bad_Variables$Many_Dependents[quantile(Jimmys_Bad_Variables$NA_Dependents_are_Mean,0.95)] <- 1
+
+train1 <-Jimmys_Bad_Variables[Jimmys_Bad_Variables[,3]< quantile(Jimmys_Bad_Variables[,3],0.95),]
+
+```
+
+```{r}
+head(Jimmys_Bad_Variables)
+Just_Bad_Variables <- subset.data.frame(Jimmys_Bad_Variables, select = c(X,SeriousDlqin2yrs, age, HighRevolving:Many_TwoToThreeMonthsLate,Many_Dependents ))
+```
+##PCA using all 22 variables
+```{r}
+pca_including_dummy_variables <- prcomp(na.omit(Jimmys_Bad_Variables[,-c(which(names(Jimmys_Bad_Variables) == "SeriousDlqin2yrs"), which(names(Jimmys_Bad_Variables) == "X"))]))
+```
+
+```{r}
+summary(pca_including_dummy_variables) #First PC has like 99.66% of variance
+pca_including_dummy_variables$rotation[,1] #I think it really likes Monthly Income as it's close to 1. Then there's two groups of variables that hover around e-04-06 and then e-10-11. Dummy variable for Monthly Income(Rich) is not useful.
+```
+```{r}
+glm_pca_including_dummy_variables <- glm(train.y ~ pca_including_dummy_variables$x[,1], family = "binomial")
+summary(glm_pca_including_dummy_variables)
+```
+##PCA using original 10 variables
+```{r}
+pca_original_data <- prcomp(train.x)
+```
+
+```{r}
+summary(pca_original_data) #PC1 has 99.66% variance explained
+pca_original_data$rotation[,1] #It also really likes MonthlyIncome and not anything else
+```
+```{r}
+glm_pca_original_data <- glm(train.y ~ pca_original_data$x[,1], family = "binomial")
+summary(glm_pca_original_data)
+```
+
+##PCA Using Dummy variables
+```{r}
+pca_dummy <- prcomp(Just_Bad_Variables[,-c(which(names(Just_Bad_Variables) == "SeriousDlqin2yrs"), which(names(Just_Bad_Variables) == "X"))])
+```
+
+```{r}
+summary(pca_dummy) #PC 1 is 100%?
+pca_dummy$rotation[,1] #Age is significant
+```
+```{r}
+glm_pca_dummy <- glm(train.y ~ pca_dummy$x[,1], family = "binomial")
+summary(glm_pca_dummy)
 ```
 
 ```{r}
@@ -172,28 +221,28 @@ hist(train1[,3]) #Do we make transformation for predictors? Not Normal Distribut
 cs_train_maj_g1 <- cs_train_maj[cs_train_maj$MonthlyIncome<500000,] # less than 500k monthly income
 cs_train_maj_g1 <- cs_train_maj[cs_train_maj$MonthlyIncome<20000,] # less than 20k monthly income
 plot(MonthlyIncome ~ age, data = cs_train_maj_g1)
-
+train <- cs_train
 ##Shelly EDA Code
-tapply(train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, median) #use this; data very imbalanced
+tapply(cs_train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, median) #use this; data very imbalanced
 
-###Next Steps
-#***need final data set which excludes outliers for which we will create final model from 
-#do box plots for age group and income; fix axes so that box is readable -Shelly
-#histogram of groupings like income by age groups, different colors -Yolanda
-#sampling of data --> randomly select instead of adding additional data for response variable -Shelly
-#ClassDiscovery package and DataExplorer --> provide initial graphs and analyses of data; also initial clustering
+##Next Steps
+# ***need final data set which excludes outliers for which we will create final model from
+# do box plots for age group and income; fix axes so that box is readable -Shelly
+# histogram of groupings like income by age groups, different colors -Yolanda
+# sampling of data --> randomly select instead of adding additional data for response variable -Shelly
+# ClassDiscovery package and DataExplorer --> provide initial graphs and analyses of data; also initial clustering
 
 
 
-#Remove outliers; maybe only keep anything greater than 10
-tapply(train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, mean) #d
-tapply(train$age, train$SeriousDlqin2yrs, median) #median age of 45 for people defaulting
-#tapply(train$`NumberOfTime30-59DaysPastDueNotWorse`, train$SeriousDlqin2yrs, mean) #2.4 times for those with delinquency incidence
-tapply(train$NumberOfTimes90DaysLate, train$SeriousDlqin2yrs, mean) #2.1 times for those with delinquency incidence vs 0.13 for no delinquency
-tapply(train$DebtRatio, train$SeriousDlqin2yrs, median) #0.43 for delinquency incidence vs 0.36 for non delinquency
-#tapply(train$NumIncome, train$SeriousDlqin2yrs, median) #delinquency monthly income of $3.8K vs $4.4K for those without delinquency
-tapply(train$NumberOfTimes90DaysLate, train$SeriousDlqin2yrs, mean)
-#summary(train$NumIncome)
+ #Remove outliers; maybe only keep anything greater than 10
+ tapply(train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, mean) #d
+ tapply(train$age, train$SeriousDlqin2yrs, median) #median age of 45 for people defaulting
+ #tapply(train$`NumberOfTime30-59DaysPastDueNotWorse`, train$SeriousDlqin2yrs, mean) #2.4 times for those with delinquency incidence
+ tapply(train$NumberOfTimes90DaysLate, train$SeriousDlqin2yrs, mean) #2.1 times for those with delinquency incidence vs 0.13 for no delinquency
+ tapply(train$DebtRatio, train$SeriousDlqin2yrs, median) #0.43 for delinquency incidence vs 0.36 for non delinquency
+ #tapply(train$NumIncome, train$SeriousDlqin2yrs, median) #delinquency monthly income of $3.8K vs $4.4K for those without delinquency
+ tapply(train$NumberOfTimes90DaysLate, train$SeriousDlqin2yrs, mean)
+ #summary(train$NumIncome)
 
 
 
@@ -271,33 +320,33 @@ cs_train_min_add <- cs_train_min[index,]
 head(cs_train_min_add)
 ```
 ```{r}
-####SHELLY -  Balance Response Variable
-set.seed(2) # for reproducibility
-raw_data <- cs_train #150k rows
-cs_train_omit <- na.omit(raw_data)   # 150k -> 120,269 obs
-new_train <- filter(cs_train_omit, cs_train_omit$SeriousDlqin2yrs == 0) #112k rows
+###SHELLY -  Balance Response Variable
+ set.seed(2) # for reproducibility
+ raw_data <- cs_train #150k rows
+ cs_train_omit <- na.omit(raw_data)   # 150k -> 120,269 obs
+ new_train <- filter(cs_train_omit, cs_train_omit$SeriousDlqin2yrs == 0) #112k rows
 
-#Check Response Variable Balance in cs_train_omit data
-table(cs_train_omit$SeriousDlqin2yrs) #8,357 1's
-
-
-new_train2 <- new_train[sample(1:nrow(new_train)),] #112k rows
-new_train3 <- new_train2[1:8357,]
-
-#######**Merge Data Together (use new_train5 variable)
-new_train4 <- filter(cs_train_omit, cs_train_omit$SeriousDlqin2yrs == 1)
-#nrow(new_train4)
-new_train5 <- rbind(new_train3, new_train4)
-nrow(new_train5) #16,714 rows as there should be (8357*2)
-table(new_train5$SeriousDlqin2yrs) #correct; equal # of 0's and 1's
-
-#Split into Training and Testing
+ #Check Response Variable Balance in cs_train_omit data
+ table(cs_train_omit$SeriousDlqin2yrs) #8,357 1's
 
 
+ new_train2 <- new_train[sample(1:nrow(new_train)),] #112k rows
+ new_train3 <- new_train2[1:8357,]
 
-
-
+ #######**Merge Data Together (use new_train5 variable)
+ new_train4 <- filter(cs_train_omit, cs_train_omit$SeriousDlqin2yrs == 1)
+ #nrow(new_train4)
+ new_train5 <- rbind(new_train3, new_train4)
+ nrow(new_train5) #16,714 rows as there should be (8357*2)
+ table(new_train5$SeriousDlqin2yrs) #correct; equal # of 0's and 1's
 ```
+##Split into Training and Testing
+
+
+
+
+
+
 
 
 
@@ -317,7 +366,7 @@ table(new_train5$SeriousDlqin2yrs) #correct; equal # of 0's and 1's
 
 
 ```{r}
-model <- glm(cs_train$SeriousDlqin2yrs ~ cs_train[,3] +cs_train[,4] +cs_train[,5] +cs_train[,6] +cs_train[,7] +cs_train[,8] +cs_train[,9] +cs_train[,10] +cs_train[,11] +cs_train[,12], family = "binomial", data = cs_train) 
+model <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ Jimmys_Bad_Variables[,3] +Jimmys_Bad_Variables[,4] +Jimmys_Bad_Variables[,5] +Jimmys_Bad_Variables[,6] +Jimmys_Bad_Variables[,7] +Jimmys_Bad_Variables[,8] +Jimmys_Bad_Variables[,9] +Jimmys_Bad_Variables[,10] +Jimmys_Bad_Variables[,11] +Jimmys_Bad_Variables[,12], family = "binomial", data = Jimmys_Bad_Variables) 
 #To Change family link use family = quasi(variance = "mu^3", link = "log") change quasi
 summary(model)
 plot(model, which = 1) #Outliers skew residuals plot
@@ -326,7 +375,7 @@ plot(model, which = 1) #Outliers skew residuals plot
 stepAIC(model)
 ```
 ```{r}
-model2 <- glm(cs_train$SeriousDlqin2yrs ~ MonthlyIncome + cs_train[,13] + cs_train[,14] + cs_train[,15] + cs_train[,16] + cs_train[,17] + cs_train[,18] + cs_train[,19] + cs_train[,20] + cs_train[,22], family = "binomial", data = cs_train)
+model2 <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ MonthlyIncome + Jimmys_Bad_Variables[,13] + Jimmys_Bad_Variables[,14] + Jimmys_Bad_Variables[,15] + Jimmys_Bad_Variables[,16] + Jimmys_Bad_Variables[,17] + Jimmys_Bad_Variables[,18] + Jimmys_Bad_Variables[,19] + Jimmys_Bad_Variables[,20] + Jimmys_Bad_Variables[,22], family = "binomial", data = Jimmys_Bad_Variables)
 model2
 model2$rank # equals 7 which is how many variables are not NA
 #Certain Dummy Variables are a  Singular Matrix Meaning that some of our variables can be constructed using a linear combination of some of the columns
@@ -334,17 +383,17 @@ model2$rank # equals 7 which is how many variables are not NA
 ```
 
 ```{r}
-model3 <- glm(cs_train$SeriousDlqin2yrs ~ MonthlyIncome + cs_train[,15] + cs_train[,16] + cs_train[,17] + cs_train[,18] + cs_train[,19], family = "binomial", data = cs_train)
+model3 <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ MonthlyIncome + Jimmys_Bad_Variables[,15] + Jimmys_Bad_Variables[,16] + Jimmys_Bad_Variables[,17] + Jimmys_Bad_Variables[,18] + Jimmys_Bad_Variables[,19], family = "binomial", data = Jimmys_Bad_Variables)
 model3
 ```
 
 ```{r}
-model4 <- glm(cs_train$SeriousDlqin2yrs ~ MonthlyIncome + cs_train[,15] + cs_train[,16] + cs_train[,17] + cs_train[,18] + cs_train[,19], family = binomial(link = "probit"), data = cs_train)
+model4 <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ MonthlyIncome + Jimmys_Bad_Variables[,15] + Jimmys_Bad_Variables[,16] + Jimmys_Bad_Variables[,17] + Jimmys_Bad_Variables[,18] + Jimmys_Bad_Variables[,19], family = binomial(link = "probit"), data = Jimmys_Bad_Variables)
 model4
 ```
 
 ```{r}
-model5 <- glm(cs_train$SeriousDlqin2yrs ~ MonthlyIncome + cs_train[,15] + cs_train[,16] + cs_train[,17] + cs_train[,18] + cs_train[,19], family = binomial(link = "cloglog"), data = cs_train) #cloglog link
+model5 <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ MonthlyIncome + Jimmys_Bad_Variables[,15] + Jimmys_Bad_Variables[,16] + Jimmys_Bad_Variables[,17] + Jimmys_Bad_Variables[,18] + Jimmys_Bad_Variables[,19], family = binomial(link = "cloglog"), data = Jimmys_Bad_Variables) #cloglog link
 model5
 ```
 
@@ -354,7 +403,7 @@ anova(model,model2,model3,model4,model5) #model 2 is the one with NA values
 ```
 
 ```{r}
-x <- data.frame(cs_train$SeriousDlqin2yrs, cs_train$MonthlyIncome, cs_train[,15],cs_train[,16],cs_train[,17], cs_train[,18],cs_train[,19])
+x <- data.frame(Jimmys_Bad_Variables$SeriousDlqin2yrs, Jimmys_Bad_Variables$MonthlyIncome, Jimmys_Bad_Variables[,15],Jimmys_Bad_Variables[,16],Jimmys_Bad_Variables[,17], Jimmys_Bad_Variables[,18],Jimmys_Bad_Variables[,19])
 x <- na.omit(x) #Remember Monthly Income contains NA values
 x_for_ridge <- data.matrix(x[,-1]) #Everything but Response Variable
 ridge_model5 <- cv.glmnet(x_for_ridge,x[,1], alpha = 0, standardize = TRUE, nfolds = length(x))
@@ -376,13 +425,7 @@ lasso_model5
 
 
 
-```{r}
-# Split x and y variables
-train.x = cs_train[,-which(names(cs_train) == "SeriousDlqin2yrs")]
-train.y = cs_train$SeriousDlqin2yrs
-test.x = cs_test[,-which(names(cs_test) == "SeriousDlqin2yrs")]
-test.y = cs_test$SeriousDlqin2yrs
-```
+
 
 ### Model after recoding Random Forest
 
@@ -513,4 +556,59 @@ print(paste("Pearson's X^2 =",round(sum(residuals(model.final,type="pearson")^2)
 
 qchisq(0.95,802)
 #781.61<868.99, so we fail to reject the null hypothesis and conclude that the logistic model fits the data.
+```
+```{r}
+sum(cs_train[,2])
+sum(cs_test[,2])
+```
+
+```{r}
+training_dataset <- data.frame(train.x, train.y)
+kmeans_model_train  <- kmeans(training_dataset, centers = 5) # centers because paper had 5 clusters
+kmeans_model_train$centers #what each cluster's average values are for each variable. The most obvious clustering is by income
+#Cluster 3 and 4 are different than Cluster 1 and 2 in terms of the Response Variable.
+```
+
+```{r}
+testing_data <- data.frame(test.x,test.y)
+kmeans_model_test  <- kmeans(testing_data, centers = 5) #testing to see if test data has similar clusters as training data and it looks to be true. this means we can perhaps predict response variable of test data using training data
+kmeans_model_test$centers #Clusters are grouped as (1,2), (3,5) and (4) for Response Variables.
+```
+
+```{r}
+#predict(kmeans_model_train, newdata=test.x, type="response")
+prediction_result <- predict.glm(glm_pca_original_data, newdata = testing_data)
+prediction_result <- prediction_result[1:length(test.y)]
+head(test.y)
+prediction_pca = prediction(prediction_result, test.y)
+plot(performance(prediction_pca, "acc"))
+table(test.y, result_m2>0.2)
+plot(performance(prediction_pca,"tpr","fpr"), colorize=T)
+abline(0,1)
+pca_auc_ROCR2 <- performance(prediction_pca, measure = "auc")
+pca_auc_ROCR2@y.values[[1]]
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
 ```
