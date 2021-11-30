@@ -171,6 +171,32 @@ hist(train1[,3]) #Do we make transformation for predictors? Not Normal Distribut
 cs_train_maj_g1 <- cs_train_maj[cs_train_maj$MonthlyIncome<500000,] # less than 500k monthly income
 cs_train_maj_g1 <- cs_train_maj[cs_train_maj$MonthlyIncome<20000,] # less than 20k monthly income
 plot(MonthlyIncome ~ age, data = cs_train_maj_g1)
+
+##Shelly EDA Code
+tapply(train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, median) #use this; data very imbalanced
+
+###Next Steps
+#***need final data set which excludes outliers for which we will create final model from 
+#do box plots for age group and income; fix axes so that box is readable -Shelly
+#histogram of groupings like income by age groups, different colors -Yolanda
+#sampling of data --> randomly select instead of adding additional data for response variable -Shelly
+#ClassDiscovery package and DataExplorer --> provide initial graphs and analyses of data; also initial clustering
+
+
+
+#Remove outliers; maybe only keep anything greater than 10
+tapply(train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, mean) #d
+tapply(train$age, train$SeriousDlqin2yrs, median) #median age of 45 for people defaulting
+tapply(train$`NumberOfTime30-59DaysPastDueNotWorse`, train$SeriousDlqin2yrs, mean) #2.4 times for those with delinquency incidence
+tapply(train$NumberOfTimes90DaysLate, train$SeriousDlqin2yrs, mean) #2.1 times for those with delinquency incidence vs 0.13 for no delinquency
+tapply(train$DebtRatio, train$SeriousDlqin2yrs, median) #0.43 for delinquency incidence vs 0.36 for non delinquency
+tapply(train$NumIncome, train$SeriousDlqin2yrs, median) #delinquency monthly income of $3.8K vs $4.4K for those without delinquency
+tapply(train$NumberOfTimes90DaysLate, train$SeriousDlqin2yrs, mean)
+summary(train$NumIncome)
+
+
+
+
 ```
 
 ## Question/Goal
