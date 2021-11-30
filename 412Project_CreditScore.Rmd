@@ -269,6 +269,37 @@ length(index)
 cs_train_min_add <- cs_train_min[index,]
 head(cs_train_min_add)
 ```
+```{r}
+####SHELLY -  Balance Response Variable
+set.seed(2) # for reproducibility
+raw_data <- cs_train #150k rows
+cs_train_omit <- na.omit(raw_data)   # 150k -> 120,269 obs
+new_train <- filter(cs_train_omit, cs_train_omit$SeriousDlqin2yrs == 0) #112k rows
+
+#Check Response Variable Balance in cs_train_omit data
+table(cs_train_omit$SeriousDlqin2yrs) #8,357 1's
+
+
+new_train2 <- new_train[sample(1:nrow(new_train)),] #112k rows
+new_train3 <- new_train2[1:8357,]
+
+#######**Merge Data Together (use new_train5 variable)
+new_train4 <- filter(cs_train_omit, cs_train_omit$SeriousDlqin2yrs == 1)
+#nrow(new_train4)
+new_train5 <- rbind(new_train3, new_train4)
+nrow(new_train5) #16,714 rows as there should be (8357*2)
+table(new_train5$SeriousDlqin2yrs) #correct; equal # of 0's and 1's
+
+#Split into Training and Testing
+
+
+
+
+
+```
+
+
+
 
 ## Which models to try
 
