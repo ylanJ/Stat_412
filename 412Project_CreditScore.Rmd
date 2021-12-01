@@ -85,6 +85,10 @@ test.y = cs_test$SeriousDlqin2yrs
 
 ```{r}
 
+```
+
+```{r}
+
 hist(cs_train[,2]) #Response Variable
 hist(cs_train[,3]) #RevolvingUtilizationOfUnsecuredLines
 hist(cs_train[,4]) #age
@@ -223,8 +227,9 @@ n_add <- 1000
 
 n_min <- nrow(cs_train_min)
 n_min
+n_maj <- nrow(cs_train_maj)
 index <- sample(n_min, n_add, replace = TRUE)
-
+index_maj <- sample(n_maj, n_add, replace = TRUE)
 #plot(density(index),  main="")  # show density curve of the index we randomized
 hist(index, breaks = 100)
 min(index)
@@ -234,6 +239,10 @@ length(index)
 # We add the additional data for future analysis
 cs_train_min_add <- cs_train_min[index,]
 head(cs_train_min_add)
+cs_train_maj_add <- cs_train_maj[index_maj,]
+head(cs_train_maj_add)
+nrow(cs_train_maj)
+nrow(cs_train_maj_add)
 ```
 
 ### b) Resampling Majority Data (new_train.final 1 & 2)
@@ -293,6 +302,23 @@ training_dataset <- data.frame(train.x, train.y)
 kmeans_model_train  <- kmeans(training_dataset, centers = 5) # centers because paper had 5 clusters
 kmeans_model_train$centers #what each cluster's average values are for each variable. The most obvious clustering is by income
 #Cluster 3 and 4 are different than Cluster 1 and 2 in terms of the Response Variable.
+kmeans_model_train$size
+```
+```{r}
+set.seed(500)
+Majority <- cs_train_maj[,-which(names(cs_train_maj) == "X")]
+kmeans_model_train_majority <- kmeans(Majority, centers = 5)
+kmeans_model_train_majority$centers
+kmeans_model_train_majority$size
+cluster_majority <-kmeans_model_train_majority$cluster
+Majority_with_cluster <- cbind(Majority, cluster = kmeans_model_train_majority$cluster)
+head(Majority_with_cluster)
+```
+```{r}
+Minority <- cs_train_min[,-which(names(cs_train_min) == "X")]
+kmeans_model_train_minority <- kmeans(Minority, centers = 5)
+kmeans_model_train_minority$centers
+kmeans_model_train_minority$size
 ```
 
 ```{r}
