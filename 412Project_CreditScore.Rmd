@@ -75,10 +75,10 @@ str(cs_train_maj)
 
 ```{r}
 # Split x and y variables
-train.x = cs_train[,-which(names(cs_train) == "SeriousDlqin2yrs")]
+train.x = cs_train[,-which(names(cs_train) == "SeriousDlqin2yrs")]  # 72,161 obs of 10 var
 train.x = cs_train[,-c(which(names(cs_train) == "SeriousDlqin2yrs"), which(names(cs_train) == "X"), which(names(cs_train)== "NA_Indicator"))]
 train.y = cs_train$SeriousDlqin2yrs
-test.x = cs_test[,-which(names(cs_test) == "SeriousDlqin2yrs")]
+test.x = cs_test[,-which(names(cs_test) == "SeriousDlqin2yrs")]   # 48,108 obs
 test.x = cs_test[,-c(which(names(cs_test) == "SeriousDlqin2yrs"), which(names(cs_test) == "X"))]
 test.y = cs_test$SeriousDlqin2yrs
 ```
@@ -215,36 +215,6 @@ tapply(cs_train$RevolvingUtilizationOfUnsecuredLines, train$SeriousDlqin2yrs, me
 - Use NA indicator 0 or 1 (maybe use mean/median)
 
 
-### a) Boostrapping Minority Data (cs_train_min_add) (1000 obs)
-
-- Currently created 1000 additional data, can add more
-
-```{r}
-# Boostrapping Minority Data
-set.seed(1) # for reproducibility
-# set number of minority data to reproduce
-n_add <- 1000
-
-n_min <- nrow(cs_train_min)
-n_min
-n_maj <- nrow(cs_train_maj)
-index <- sample(n_min, n_add, replace = TRUE)
-index_maj <- sample(n_maj, n_add, replace = TRUE)
-#plot(density(index),  main="")  # show density curve of the index we randomized
-hist(index, breaks = 100)
-min(index)
-max(index)
-length(index)
-
-# We add the additional data for future analysis
-cs_train_min_add <- cs_train_min[index,]
-head(cs_train_min_add)
-cs_train_maj_add <- cs_train_maj[index_maj,]
-head(cs_train_maj_add)
-nrow(cs_train_maj)
-nrow(cs_train_maj_add)
-```
-
 ### b) Resampling Majority Data (new_train.final 1 & 2)
 
 - Method 1: use Full omit Data to sample majority data (new_train.final1) (8357*2)
@@ -340,6 +310,8 @@ kmeans_model_test$centers #Clusters are grouped as (1,2), (3,5) and (4) for Resp
 
 ### Method 1: PCA
 
+
+
 ### 1-a) PCA with Unbalanced Data
 
 ### PCA using all 22 variables
@@ -411,9 +383,14 @@ model <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ Jimmys_Bad_Variables[,3] +J
 #To Change family link use family = quasi(variance = "mu^3", link = "log") change quasi
 summary(model)
 plot(model, which = 1) #Outliers skew residuals plot
+
+## Recode the model Orignial Predictors
+model <- glm(cs_train$SeriousDlqin2yrs ~ ., family = "binomial", data = train.x)
 ```
 ```{r}
-stepAIC(model)
+# Run AIC on the model
+model_AIC <- stepAIC(model)
+model_AIC
 ```
 
 
@@ -503,14 +480,14 @@ giniplot = barplot(t(varimp[-2]/sum(varimp[-2])),las=2,cex.names=1, main="Gini I
 ```
 
 
-### 4 b) Random Forest with Balanced Data
+## 4 b) Random Forest with Balanced Data
 
 ```{r}
 
 ```
 
 
-## 5. Evaluating Model/Comparing results
+# 5. Evaluating Model/Comparing results
 
 - mmp plots to see if model fits the data, as well as the pearson Chi-square test
 - checking for outliers and influential points
@@ -519,8 +496,7 @@ giniplot = barplot(t(varimp[-2]/sum(varimp[-2])),las=2,cex.names=1, main="Gini I
 
 
 
-### 5-1 Evaluation on Final Model using Training Data
-
+## 5-1 Evaluation on Final Model using Training Data
 
 ```{r}
 ## Set model as final model
@@ -539,8 +515,7 @@ table(train.y, train_preds>0.2) # accurary on train
 ```
 
 
-
-### 5-2 Marginal Model Plots
+## 5-2 Marginal Model Plots
 # Need to Update!!
 
 ```{r}
@@ -553,8 +528,9 @@ mmp(model.final)
 ```
 
 
-###  5-3 Goodness of Fit using Hosmer-Lemeshow Test
+##  5-3 Goodness of Fit using Hosmer-Lemeshow Test
 
+### a) 
 The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
 
 ```{r}
@@ -590,16 +566,13 @@ c(hlstat, nrow(hldf))
 
 ### AUC
 
-## Need to fix the Prediction function!!!
-Predict -> Currently gives 120k, expecting 80k
+## 5-3 Model Performance with Test Data
+
 
 ```{r}
-
 #Final Model(w/ interaction term ReugularMedicine * PhysicallyActive)
 result_m2 = predict(model.final, newdata=test.x, type="response") 
 
-# Fix Later!!! Forced the length to be the same
-result_m2 <- result_m2[1:length(test.y)]
 head(test.y)
 pred_m2 = prediction(result_m2, test.y)
 
@@ -619,7 +592,7 @@ abline(0,1)
 auc_ROCR2 <- performance(pred_m2, measure = "auc")
 auc_ROCR2@y.values[[1]]
 ```
-
+### 
 
 ```{r}
 #predict(kmeans_model_train, newdata=test.x, type="response")
@@ -716,6 +689,37 @@ assignments <- factor(sample(c(1,2,3), n_maj, replace = TRUE))
 #plot(dat, col=assignments, xlim = c(0,110), asp=1)
 #plot(dat, col=assignments)
 ```
+
+### a) REMOVE SECTION - NOT APPLICABLE ---Boostrapping Minority Data (cs_train_min_add) (1000 obs)
+
+- Currently created 1000 additional data, can add more
+
+```{r}
+# Boostrapping Minority Data
+set.seed(1) # for reproducibility
+# set number of minority data to reproduce
+n_add <- 1000
+
+n_min <- nrow(cs_train_min)
+n_min
+n_maj <- nrow(cs_train_maj)
+index <- sample(n_min, n_add, replace = TRUE)
+index_maj <- sample(n_maj, n_add, replace = TRUE)
+#plot(density(index),  main="")  # show density curve of the index we randomized
+hist(index, breaks = 100)
+min(index)
+max(index)
+length(index)
+
+# We add the additional data for future analysis
+cs_train_min_add <- cs_train_min[index,]
+head(cs_train_min_add)
+cs_train_maj_add <- cs_train_maj[index_maj,]
+head(cs_train_maj_add)
+nrow(cs_train_maj)
+nrow(cs_train_maj_add)
+```
+
 ### Maybe don't need session (END) ####
 ```{r}
 
