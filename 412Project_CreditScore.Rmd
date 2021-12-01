@@ -274,6 +274,17 @@ kmeans_model_train$centers #what each cluster's average values are for each vari
 #Cluster 3 and 4 are different than Cluster 1 and 2 in terms of the Response Variable.
 kmeans_model_train$size
 ```
+##Sample from Majority Data Proportional to Minority Data
+```{r}
+set.seed(500)
+Majority <- cs_train_maj[,-which(names(cs_train_maj) == "X")]
+kmeans_model_train_majority <- kmeans(Majority, centers = 5)
+kmeans_model_train_majority$centers
+kmeans_model_train_majority$size
+cluster_majority <-kmeans_model_train_majority$cluster
+Majority_with_cluster <- cbind(Majority, cluster = kmeans_model_train_majority$cluster)
+head(Majority_with_cluster)
+```
 
 ```{r}
 Cluster3 <- subset.data.frame(Majority_with_cluster,cluster == 3)
@@ -287,16 +298,7 @@ balanced_dataset.1 <- rbind(cs_train_min[-which(names(cs_train_min) == "X")], Sa
 head(balanced_dataset.1)
 ```
 
-```{r}
-set.seed(500)
-Majority <- cs_train_maj[,-which(names(cs_train_maj) == "X")]
-kmeans_model_train_majority <- kmeans(Majority, centers = 5)
-kmeans_model_train_majority$centers
-kmeans_model_train_majority$size
-cluster_majority <-kmeans_model_train_majority$cluster
-Majority_with_cluster <- cbind(Majority, cluster = kmeans_model_train_majority$cluster)
-head(Majority_with_cluster)
-```
+
 ```{r}
 Minority <- cs_train_min[,-which(names(cs_train_min) == "X")]
 kmeans_model_train_minority <- kmeans(Minority, centers = 5)
