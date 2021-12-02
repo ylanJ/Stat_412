@@ -25,9 +25,6 @@ library(caTools)
 #number_sections: true
 ```
 
-## Paper 12-15 pages
-## Presentation 6-8 mins
-
 ## 0. Cleaning Up Data and Creating Data Groups
 
 ### a) Remove NA Data
@@ -293,9 +290,9 @@ head(Majority_with_cluster)
 Cluster1 <- subset.data.frame(Majority_with_cluster,cluster == 1)
 Cluster2 <- subset.data.frame(Majority_with_cluster,cluster == 2)
 Cluster3 <- subset.data.frame(Majority_with_cluster,cluster == 3)
-Special_Small_Clusters <- sum(nrow(Cluster1),nrow(Cluster2),nrow(Cluster4))
 Cluster4 <- subset.data.frame(Majority_with_cluster,cluster == 4)
 Cluster5 <- subset.data.frame(Majority_with_cluster, cluster == 5)
+Special_Small_Clusters <- sum(nrow(Cluster1),nrow(Cluster2),nrow(Cluster4))
 Sample3 <- Cluster3[sample(nrow(Cluster3), nrow(Cluster3)/(nrow(Majority) - Special_Small_Clusters) * nrow(cs_train_min), replace = FALSE),]
 Sample3
 nrow(Sample3)
@@ -305,11 +302,11 @@ balanced_dataset.1 <- rbind(cs_train_min[-which(names(cs_train_min) == "X")],Clu
 head(balanced_dataset.1)
 nrow(balanced_dataset.1)
 ```
-
 ```{r}
 balanced_x <- data.matrix(balanced_dataset.1[,-1])
 balanced_y <- data.matrix(balanced_dataset.1[,1])
 ```
+
 
 ```{r}
 Minority <- cs_train_min[,-which(names(cs_train_min) == "X")]
@@ -333,7 +330,19 @@ kmeans_model_test$centers #Clusters are grouped as (1,2), (3,5) and (4) for Resp
 
 - RF
 
+```{r}
+AIC_unbalanced <- 1:4
+AIC_balanced <- 1:4
+names(AIC_unbalanced)[1] <- "PCA"
+names(AIC_unbalanced)[2] <- "Regular GLM"
+names(AIC_unbalanced)[3] <- "Ridge"
+names(AIC_unbalanced)[4] <- "Lasso"
 
+names(AIC_balanced)[1] <- "PCA"
+names(AIC_balanced)[2] <- "Regular GLM"
+names(AIC_balanced)[3] <- "Ridge"
+names(AIC_balanced)[4] <- "Lasso"
+```
 
 ### Method 1: PCA
 
@@ -369,6 +378,7 @@ pca_original_data$rotation[,1] #It also really likes MonthlyIncome and not anyth
 ```{r}
 glm_pca_original_data <- glm(train.y ~ pca_original_data$x[,1], family = "binomial")
 summary(glm_pca_original_data)
+AIC_unbalanced[1] <- glm_pca_original_data$aic
 ```
 
 ### PCA Using Dummy variables
@@ -394,11 +404,12 @@ pca_balanced <- prcomp(balanced_dataset.1[,-which(names(balanced_dataset.1) == "
 summary(pca_balanced) #99.98% Variance is explained by PC1
 pca_balanced$rotation[,1]
 ```
-
 ```{r}
 glm_pca_balanced <- glm(balanced_dataset.1$SeriousDlqin2yrs ~ pca_balanced$x[,1], family = "binomial")
 summary(glm_pca_balanced)
+AIC_balanced[1] <- glm_pca_balanced$aic
 ```
+
 
 
 
@@ -413,13 +424,14 @@ We now try to improve the model using balanced data.
 ```{r}
 ## Orignial Predictors
 
-model <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ Jimmys_Bad_Variables[,3] +Jimmys_Bad_Variables[,4] +Jimmys_Bad_Variables[,5] +Jimmys_Bad_Variables[,6] +Jimmys_Bad_Variables[,7] +Jimmys_Bad_Variables[,8] +Jimmys_Bad_Variables[,9] +Jimmys_Bad_Variables[,10] +Jimmys_Bad_Variables[,11] +Jimmys_Bad_Variables[,12], family = "binomial", data = Jimmys_Bad_Variables) 
+model <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ ., family = "binomial", data = subset(Jimmys_Bad_Variables, select = RevolvingUtilizationOfUnsecuredLines:NumberOfDependents)) 
 #To Change family link use family = quasi(variance = "mu^3", link = "log") change quasi
 summary(model)
 plot(model, which = 1) #Outliers skew residuals plot
 
 ## Recode the model Orignial Predictors
 model <- glm(cs_train$SeriousDlqin2yrs ~ ., family = "binomial", data = train.x)
+AIC_unbalanced[2] <- model$aic
 ```
 ```{r}
 # Run AIC on the model
@@ -437,17 +449,17 @@ model2$rank # equals 7 which is how many variables are not NA
 #Certain Dummy Variables are a  Singular Matrix Meaning that some of our variables can be constructed using a linear combination of some of the columns
 #Not Sure what to do, but I'll remove these variables in the meantime
 ```
+
 ### 2 c) GLM Original Predictors  Using Balanced Data
 
 ```{r}
 model_balanced <- glm(balanced_dataset.1$SeriousDlqin2yrs ~ ., data = balanced_dataset.1)
 summary(model_balanced)
+AIC_balanced[2] <- model_balanced$aic
 ```
-
 ```{r}
 stepAIC(model_balanced) #remove Debt Ratio and NumberOfOpenCreditLinesAndLoans
 ```
-
 ```{r}
 model_balanced_final <- glm(formula = balanced_dataset.1$SeriousDlqin2yrs ~ RevolvingUtilizationOfUnsecuredLines + 
     age + NumberOfTime30.59DaysPastDueNotWorse + MonthlyIncome + 
@@ -456,6 +468,9 @@ model_balanced_final <- glm(formula = balanced_dataset.1$SeriousDlqin2yrs ~ Revo
     data = balanced_dataset.1)
 summary(model_balanced_final)
 ```
+
+
+
 
 ```{r}
 model3 <- glm(Jimmys_Bad_Variables$SeriousDlqin2yrs ~ MonthlyIncome + Jimmys_Bad_Variables[,15] + Jimmys_Bad_Variables[,16] + Jimmys_Bad_Variables[,17] + Jimmys_Bad_Variables[,18] + Jimmys_Bad_Variables[,19], family = "binomial", data = Jimmys_Bad_Variables)
@@ -477,9 +492,6 @@ anova(model,model2,model3,model4,model5) #model 2 is the one with NA values
 #model 1 is the best but we can check model 5 using our dummy variables
 ```
 
-
-### 2 c) GLM Original Predictors with Balanced Data
-
 ```{r}
 
 ```
@@ -490,11 +502,17 @@ anova(model,model2,model3,model4,model5) #model 2 is the one with NA values
 ### 3 a) Ridge with Unbalanced Data
 
 ```{r}
-x <- data.frame(Jimmys_Bad_Variables$SeriousDlqin2yrs, Jimmys_Bad_Variables$MonthlyIncome, Jimmys_Bad_Variables[,15],Jimmys_Bad_Variables[,16],Jimmys_Bad_Variables[,17], Jimmys_Bad_Variables[,18],Jimmys_Bad_Variables[,19])
+x <- data.frame(training_dataset)
 x <- na.omit(x) #Remember Monthly Income contains NA values
 x_for_ridge <- data.matrix(x[,-1]) #Everything but Response Variable
 ridge_model5 <- cv.glmnet(x_for_ridge,x[,1], alpha = 0, standardize = TRUE, nfolds = length(x))
 ridge_model5
+Log.Likelihood <- ridge_model5$glmnet.fit$nulldev - ridge_model5$glmnet.fit$nulldev * (1- ridge_model5$glmnet.fit$dev.ratio[which(ridge_model5$glmnet.fit$lambda == ridge_model5$lambda.min)])
+k <- ridge_model5$glmnet.fit$df[which(ridge_model5$glmnet.fit$lambda == ridge_model5$lambda.min)]
+n <- ridge_model5$glmnet.fit$nobs
+AICc <- -Log.Likelihood + 2 * k + 2 * k * (k+1)/(n-k-1)
+AIC_unbalanced[3] <- AICc
+
 ```
 
 ### 3 b) Ridge with Balanced Data
@@ -503,6 +521,11 @@ ridge_model5
 x_for_ridge_balanced <- data.matrix(balanced_dataset.1[,-1])
 ridge_model_balanced <- cv.glmnet(x_for_ridge_balanced,balanced_dataset.1[,1], alpha = 0, standardize = TRUE, nfolds = length(balanced_dataset.1))
 ridge_model_balanced
+Log.Likelihood <- ridge_model_balanced$glmnet.fit$nulldev - ridge_model_balanced$glmnet.fit$nulldev * (1- ridge_model_balanced$glmnet.fit$dev.ratio[which(ridge_model_balanced$glmnet.fit$lambda == ridge_model_balanced$lambda.min)])
+k <- ridge_model_balanced$glmnet.fit$df[which(ridge_model_balanced$glmnet.fit$lambda == ridge_model_balanced$lambda.min)]
+n <- ridge_model_balanced$glmnet.fit$nobs
+AICc <- -Log.Likelihood + 2 * k + 2 * k * (k+1)/(n-k-1)
+AIC_balanced[3] <- AICc
 ```
 
 ### Method 4: Lasso
@@ -512,6 +535,13 @@ ridge_model_balanced
 ```{r}
 lasso_model5 <- cv.glmnet(x_for_ridge,x[,1], alpha = 1, standardize = TRUE, nfolds = length(x))
 lasso_model5
+Log.Likelihood <- lasso_model5$glmnet.fit$nulldev - lasso_model5$glmnet.fit$nulldev * (1- lasso_model5$glmnet.fit$dev.ratio[which(lasso_model5$glmnet.fit$lambda == lasso_model5$lambda.min)])
+k <- lasso_model5$glmnet.fit$df[which(lasso_model5$glmnet.fit$lambda == lasso_model5$lambda.min)]
+n <- lasso_model5$glmnet.fit$nobs
+AICc <- -Log.Likelihood + 2 * k + 2 * k * (k+1)/(n-k-1)
+AICc
+
+AIC_unbalanced[4] <- AICc
 ```
 
 ### 4 b) Lasso with Balanced Data
@@ -519,6 +549,12 @@ lasso_model5
 ```{r}
 lasso_model_balanced <- cv.glmnet(x_for_ridge_balanced,balanced_dataset.1[,1], alpha = 1, standardize = TRUE, nfolds = length(balanced_dataset.1))
 lasso_model_balanced
+Log.Likelihood <- lasso_model_balanced$glmnet.fit$nulldev - lasso_model_balanced$glmnet.fit$nulldev * (1- lasso_model_balanced$glmnet.fit$dev.ratio[which(lasso_model_balanced$glmnet.fit$lambda == lasso_model_balanced$lambda.min)])
+k <- lasso_model_balanced$glmnet.fit$df[which(lasso_model_balanced$glmnet.fit$lambda == lasso_model_balanced$lambda.min)]
+n <- lasso_model_balanced$glmnet.fit$nobs
+AICc <- -2 * Log.Likelihood + 2 * k + 2 * k * (k+1)/(n-k-1)
+AICc
+AIC_balanced[4] <- AICc
 ```
 
 
@@ -555,9 +591,9 @@ var_balancedimp = var_balanced.imp[order(var_balanced.imp$MeanDecreaseGini,decre
 par(mar = c(7.5,3,2,2)) 
 giniplot = barplot(t(var_balancedimp[-2]/sum(var_balancedimp[-2])),las=2,cex.names=1, main="Gini Impurity Index Plot")
 ```
-
 ```{r}
-getTree(model_balanced.rf, k = 1, labelVar =  TRUE)
+Tree <- (getTree(model_balanced.rf, k = 1, labelVar =  TRUE))
+head(Tree)
 ```
 
 
@@ -570,23 +606,18 @@ getTree(model_balanced.rf, k = 1, labelVar =  TRUE)
 
 
 
-### Model 1: GLM Model With Original Predictors - Training
-
-### a) Residual Plot (Only training no testing)
+## 5-1 Evaluation on Final Model using Training Data
 
 ```{r}
 ## Set model as final model
 model.final <- model
 
-plot(model.final, 1:2)
-```
-
-### b) Confusion Matrix/Accuracy
-
-```{r}
 ## Evaluation on Final model using Training Data
 train_preds = predict(model.final, newdata=train.x, type="response")
 head(train_preds[is.na(train_preds)])
+
+#train.x[c(7,9),]
+#train_preds[is.na(train_preds)]
 
 pred_compare = prediction(train_preds, train.y)
 plot(performance(pred_compare, "acc"))
@@ -594,8 +625,12 @@ table(train.y, train_preds>0.2) # accurary on train
 ```
 
 
-### c) Goodness of Fit using Hosmer-Lemeshow Test
- 
+
+
+
+##  5-3 Goodness of Fit using Hosmer-Lemeshow Test
+
+### a) 
 The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
 
 ```{r}
@@ -629,13 +664,13 @@ c(hlstat, nrow(hldf))
 
 ```
 
+### AUC
 
-### Model 1: GLM Model With Original Predictors - Testing
+## 5-3 Model Performance with Test Data
 
-### d) Confusion Matrix/Accuracy - Testing
 
 ```{r}
-#Confusion Matrix on test data
+#Final Model(w/ interaction term ReugularMedicine * PhysicallyActive)
 result_m2 = predict(model.final, newdata=test.x, type="response") 
 
 head(test.y)
@@ -644,12 +679,179 @@ pred_m2 = prediction(result_m2, test.y)
 
 plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
 table(test.y, result_m2>0.2)
+
+
+#Accuracy :
+#Sensitivity : 
+#Specificity : 
+#The Specificity and accuracy improved a bit compared to the previous model without interaction term, sensitivity decreased a bit but still at a very high level.
+plot(performance(pred_m2,"tpr","fpr"), colorize=T)
+abline(0,1)
+
+#Now we calculate the area under the curve (AUC) and accuracy of the model given above (glmModel2)
+auc_ROCR2 <- performance(pred_m2, measure = "auc")
+auc_ROCR2@y.values[[1]]
+```
+### 
+### GLM Model with Balanced Dataset
+```{r}
+## Set model as final model
+model.final <- model_balanced
+
+## Evaluation on Final model using Training Data
+train_preds = predict(model.final, newdata=train.x, type="response")
+head(train_preds[is.na(train_preds)])
+
+#train.x[c(7,9),]
+#train_preds[is.na(train_preds)]
+
+pred_compare = prediction(train_preds, train.y)
+plot(performance(pred_compare, "acc"))
+table(train.y, train_preds>0.66) # accurary on train
 ```
 
 
-### e) AUC
+
+
+
+##  5-3 Goodness of Fit using Hosmer-Lemeshow Test
+
+### a) 
+The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
 
 ```{r}
+# Goodness of Fit using Hosmer-Lemeshow Test
+linpred=predict(model.final)
+
+cs_train_m <- mutate(balanced_dataset.1, predprob=predict(model.final, type="response"))  # cal p^_i
+gdf <- group_by(cs_train_m, ntile(linpred, 1000)) # group up the data by eta_x into 100 groups
+hldf <- summarise(gdf, y=sum(SeriousDlqin2yrs==1), ppred=mean(predprob), count=n())
+head(hldf)
+
+
+# We adjust the size of the bins until there's only one group with less than 5
+hldf[hldf$count<5,]
+
+# Observed Proportion Confidence Interval vs Predicted Probability
+hldf <- mutate(hldf, se.fit=sqrt(ppred*(1-ppred)/count))
+
+ggplot(hldf,aes(x=ppred,y=y/count,ymin=y/count-2*se.fit, ymax=y/count+2*se.fit))+
+  geom_point()+geom_linerange(color=grey(0.75))+
+  geom_abline(intercept = 0,slope = 1)+
+  xlab("Predicted Probability")+
+  ylab("Observed Proportion")
+
+# Hosmer-Lemeshow statistics
+hlstat <- with(hldf, sum((y-count*ppred) ^2/(count * ppred * (1-ppred))))
+c(hlstat, nrow(hldf))
+
+# The p-value is given by:
+1-pchisq(hlstat, nrow(hldf)-2)
+
+```
+
+### AUC
+
+## 5-3 Model Performance with Test Data
+
+
+```{r}
+#Final Model(w/ interaction term ReugularMedicine * PhysicallyActive)
+result_m2 = predict(model.final, newdata=test.x, type="response") 
+
+head(test.y)
+pred_m2 = prediction(result_m2, test.y)
+
+
+plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
+table(test.y, result_m2>0.2)
+
+
+#Accuracy :
+#Sensitivity : 
+#Specificity : 
+#The Specificity and accuracy improved a bit compared to the previous model without interaction term, sensitivity decreased a bit but still at a very high level.
+plot(performance(pred_m2,"tpr","fpr"), colorize=T)
+abline(0,1)
+
+#Now we calculate the area under the curve (AUC) and accuracy of the model given above (glmModel2)
+auc_ROCR2 <- performance(pred_m2, measure = "auc")
+auc_ROCR2@y.values[[1]]
+```
+###Ridge Model Unbiased Dataset
+```{r}
+## Set model as final model
+model.final <- ridge_model5
+
+## Evaluation on Final model using Training Data
+train_preds = predict(model.final, newx=as.matrix(train.x), type="response")
+head(train_preds[is.na(train_preds)])
+
+#train.x[c(7,9),]
+#train_preds[is.na(train_preds)]
+
+pred_compare = prediction(train_preds, train.y)
+plot(performance(pred_compare, "acc"))
+table(train.y, train_preds>0.2) # accurary on train
+```
+
+
+
+
+
+##  5-3 Goodness of Fit using Hosmer-Lemeshow Test
+
+### a) 
+The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
+
+```{r}
+# Goodness of Fit using Hosmer-Lemeshow Test
+linpred=predict(model.final, newx = as.matrix(train.x), type = "response")
+
+cs_train_m <- mutate(cs_train, predprob=predict(model.final, newx = as.matrix(train.x), type="response"))  # cal p^_i
+gdf <- group_by(cs_train_m, ntile(linpred, 1000)) # group up the data by eta_x into 100 groups
+hldf <- summarise(gdf, y=sum(SeriousDlqin2yrs==1), ppred=mean(predprob), count=n())
+head(hldf)
+
+
+# We adjust the size of the bins until there's only one group with less than 5
+hldf[hldf$count<5,]
+
+# Observed Proportion Confidence Interval vs Predicted Probability
+hldf <- mutate(hldf, se.fit=sqrt(ppred*(1-ppred)/count))
+
+ggplot(hldf,aes(x=ppred,y=y/count,ymin=y/count-2*se.fit, ymax=y/count+2*se.fit))+
+  geom_point()+geom_linerange(color=grey(0.75))+
+  geom_abline(intercept = 0,slope = 1)+
+  xlab("Predicted Probability")+
+  ylab("Observed Proportion")
+
+# Hosmer-Lemeshow statistics
+hlstat <- with(hldf, sum((y-count*ppred) ^2/(count * ppred * (1-ppred))))
+c(hlstat, nrow(hldf))
+
+# The p-value is given by:
+1-pchisq(hlstat, nrow(hldf)-2)
+
+```
+
+### AUC
+
+## 5-3 Model Performance with Test Data
+
+
+```{r}
+#Final Model(w/ interaction term ReugularMedicine * PhysicallyActive)
+result_m2 = predict(model.final, newx= as.matrix(test.x), type="response") 
+
+head(test.y)
+pred_m2 = prediction(result_m2, test.y)
+
+
+plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
+table(test.y, result_m2>0.2)
+
+
 #Accuracy :
 #Sensitivity : 
 #Specificity : 
@@ -662,20 +864,266 @@ auc_ROCR2 <- performance(pred_m2, measure = "auc")
 auc_ROCR2@y.values[[1]]
 ```
 
+### Ridge Model with Balanced Dataset
+```{r}
+## Set model as final model
+model.final <- ridge_model_balanced
 
-### Model 2: ... - Training
+## Evaluation on Final model using Training Data
+train_preds = predict(model.final, newx=as.matrix(train.x), type="response")
+head(train_preds[is.na(train_preds)])
+
+#train.x[c(7,9),]
+#train_preds[is.na(train_preds)]
+
+pred_compare = prediction(train_preds, train.y)
+plot(performance(pred_compare, "acc"))
+table(train.y, train_preds>0.66) # accurary on train
+```
 
 
 
 
 
+##  5-3 Goodness of Fit using Hosmer-Lemeshow Test
+
+### a) 
+The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
+
+```{r}
+# Goodness of Fit using Hosmer-Lemeshow Test
+linpred=predict(model.final, newx = as.matrix(train.x), type = "response")
+
+cs_train_m <- mutate(cs_train, predprob=predict(model.final, newx = as.matrix(train.x), type="response"))  # cal p^_i
+gdf <- group_by(cs_train_m, ntile(linpred, 1000)) # group up the data by eta_x into 100 groups
+hldf <- summarise(gdf, y=sum(SeriousDlqin2yrs==1), ppred=mean(predprob), count=n())
+head(hldf)
 
 
+# We adjust the size of the bins until there's only one group with less than 5
+hldf[hldf$count<5,]
 
+# Observed Proportion Confidence Interval vs Predicted Probability
+hldf <- mutate(hldf, se.fit=sqrt(ppred*(1-ppred)/count))
+
+ggplot(hldf,aes(x=ppred,y=y/count,ymin=y/count-2*se.fit, ymax=y/count+2*se.fit))+
+  geom_point()+geom_linerange(color=grey(0.75))+
+  geom_abline(intercept = 0,slope = 1)+
+  xlab("Predicted Probability")+
+  ylab("Observed Proportion")
+
+# Hosmer-Lemeshow statistics
+hlstat <- with(hldf, sum((y-count*ppred) ^2/(count * ppred * (1-ppred))))
+c(hlstat, nrow(hldf))
+
+# The p-value is given by:
+1-pchisq(hlstat, nrow(hldf)-2)
+
+```
+
+### AUC
+
+## 5-3 Model Performance with Test Data
 
 
 ```{r}
+#Final Model(w/ interaction term ReugularMedicine * PhysicallyActive)
+result_m2 = predict(model.final, newx= as.matrix(test.x), type="response") 
 
+head(test.y)
+pred_m2 = prediction(result_m2, test.y)
+
+
+plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
+table(test.y, result_m2>0.2)
+
+
+#Accuracy :
+#Sensitivity : 
+#Specificity : 
+#The Specificity and accuracy improved a bit compared to the previous model without interaction term, sensitivity decreased a bit but still at a very high level.
+plot(performance(pred_m2,"tpr","fpr"), colorize=T)
+abline(0,1)
+
+#Now we calculate the area under the curve (AUC) and accuracy of the model given above (glmModel2)
+auc_ROCR2 <- performance(pred_m2, measure = "auc")
+auc_ROCR2@y.values[[1]]
+```
+###Lasso Model Unbiased Dataset
+```{r}
+## Set model as final model
+model.final <- lasso_model5
+
+## Evaluation on Final model using Training Data
+train_preds = predict(model.final, newx=as.matrix(train.x), type="response")
+head(train_preds[is.na(train_preds)])
+
+#train.x[c(7,9),]
+#train_preds[is.na(train_preds)]
+
+pred_compare = prediction(train_preds, train.y)
+plot(performance(pred_compare, "acc"))
+table(train.y, train_preds>0.2) # accurary on train
+```
+
+
+
+
+
+##  5-3 Goodness of Fit using Hosmer-Lemeshow Test
+
+### a) 
+The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
+
+```{r}
+# Goodness of Fit using Hosmer-Lemeshow Test
+linpred=predict(model.final, newx = as.matrix(train.x), type = "response")
+
+cs_train_m <- mutate(cs_train, predprob=predict(model.final, newx = as.matrix(train.x), type="response"))  # cal p^_i
+gdf <- group_by(cs_train_m, ntile(linpred, 1000)) # group up the data by eta_x into 100 groups
+hldf <- summarise(gdf, y=sum(SeriousDlqin2yrs==1), ppred=mean(predprob), count=n())
+head(hldf)
+
+
+# We adjust the size of the bins until there's only one group with less than 5
+hldf[hldf$count<5,]
+
+# Observed Proportion Confidence Interval vs Predicted Probability
+hldf <- mutate(hldf, se.fit=sqrt(ppred*(1-ppred)/count))
+
+ggplot(hldf,aes(x=ppred,y=y/count,ymin=y/count-2*se.fit, ymax=y/count+2*se.fit))+
+  geom_point()+geom_linerange(color=grey(0.75))+
+  geom_abline(intercept = 0,slope = 1)+
+  xlab("Predicted Probability")+
+  ylab("Observed Proportion")
+
+# Hosmer-Lemeshow statistics
+hlstat <- with(hldf, sum((y-count*ppred) ^2/(count * ppred * (1-ppred))))
+c(hlstat, nrow(hldf))
+
+# The p-value is given by:
+1-pchisq(hlstat, nrow(hldf)-2)
+
+```
+
+### AUC
+
+## 5-3 Model Performance with Test Data
+
+
+```{r}
+#Final Model(w/ interaction term ReugularMedicine * PhysicallyActive)
+result_m2 = predict(model.final, newx= as.matrix(test.x), type="response") 
+
+head(test.y)
+pred_m2 = prediction(result_m2, test.y)
+
+
+plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
+table(test.y, result_m2>0.2)
+
+
+#Accuracy :
+#Sensitivity : 
+#Specificity : 
+#The Specificity and accuracy improved a bit compared to the previous model without interaction term, sensitivity decreased a bit but still at a very high level.
+plot(performance(pred_m2,"tpr","fpr"), colorize=T)
+abline(0,1)
+
+#Now we calculate the area under the curve (AUC) and accuracy of the model given above (glmModel2)
+auc_ROCR2 <- performance(pred_m2, measure = "auc")
+auc_ROCR2@y.values[[1]]
+```
+
+###Lasso Model Balanced Dataset
+```{r}
+## Set model as final model
+model.final <- lasso_model_balanced
+
+## Evaluation on Final model using Training Data
+train_preds = predict(model.final, newx=as.matrix(train.x), type="response")
+head(train_preds[is.na(train_preds)])
+
+#train.x[c(7,9),]
+#train_preds[is.na(train_preds)]
+
+pred_compare = prediction(train_preds, train.y)
+plot(performance(pred_compare, "acc"))
+table(train.y, train_preds>0.6) # accurary on train
+```
+
+
+
+
+
+##  5-3 Goodness of Fit using Hosmer-Lemeshow Test
+
+### a) 
+The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
+
+```{r}
+# Goodness of Fit using Hosmer-Lemeshow Test
+linpred=predict(model.final, newx = as.matrix(train.x), type = "response")
+
+cs_train_m <- mutate(cs_train, predprob=predict(model.final, newx = as.matrix(train.x), type="response"))  # cal p^_i
+gdf <- group_by(cs_train_m, ntile(linpred, 1000)) # group up the data by eta_x into 100 groups
+hldf <- summarise(gdf, y=sum(SeriousDlqin2yrs==1), ppred=mean(predprob), count=n())
+head(hldf)
+
+
+# We adjust the size of the bins until there's only one group with less than 5
+hldf[hldf$count<5,]
+
+# Observed Proportion Confidence Interval vs Predicted Probability
+hldf <- mutate(hldf, se.fit=sqrt(ppred*(1-ppred)/count))
+
+ggplot(hldf,aes(x=ppred,y=y/count,ymin=y/count-2*se.fit, ymax=y/count+2*se.fit))+
+  geom_point()+geom_linerange(color=grey(0.75))+
+  geom_abline(intercept = 0,slope = 1)+
+  xlab("Predicted Probability")+
+  ylab("Observed Proportion")
+
+# Hosmer-Lemeshow statistics
+hlstat <- with(hldf, sum((y-count*ppred) ^2/(count * ppred * (1-ppred))))
+c(hlstat, nrow(hldf))
+
+# The p-value is given by:
+1-pchisq(hlstat, nrow(hldf)-2)
+
+```
+
+### AUC
+
+## 5-3 Model Performance with Test Data
+
+
+```{r}
+#Final Model(w/ interaction term ReugularMedicine * PhysicallyActive)
+result_m2 = predict(model.final, newx= as.matrix(test.x), type="response") 
+
+head(test.y)
+pred_m2 = prediction(result_m2, test.y)
+
+
+plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
+table(test.y, result_m2>0.2)
+
+
+#Accuracy :
+#Sensitivity : 
+#Specificity : 
+#The Specificity and accuracy improved a bit compared to the previous model without interaction term, sensitivity decreased a bit but still at a very high level.
+plot(performance(pred_m2,"tpr","fpr"), colorize=T)
+abline(0,1)
+
+#Now we calculate the area under the curve (AUC) and accuracy of the model given above (glmModel2)
+auc_ROCR2 <- performance(pred_m2, measure = "auc")
+auc_ROCR2@y.values[[1]]
+```
+
+```{r}
+AIC_models <- data.frame(AIC_unbalanced,AIC_balanced)
+AIC_models
 ```
 
 ```{r}
@@ -689,19 +1137,9 @@ auc_ROCR2@y.values[[1]]
 ```{r}
 
 ```
-
-```{r}
-
-```
-
-
-## Maybe don't need session ##################################################################
-
-### PCA-Not sure how to predict with it (skip for now)
 
 ```{r}
 #predict(kmeans_model_train, newdata=test.x, type="response")
-
 prediction_result <- predict.glm(glm_pca_original_data, newdata = testing_data)
 prediction_result <- prediction_result[1:length(test.y)]
 head(test.y)
@@ -713,6 +1151,13 @@ abline(0,1)
 pca_auc_ROCR2 <- performance(prediction_pca, measure = "auc")
 pca_auc_ROCR2@y.values[[1]]
 ```
+
+```{r}
+
+```
+
+
+## Maybe don't need session ##################################################################
 
 
 ### (0) Ensemble Learning Used by Paper
@@ -803,17 +1248,17 @@ nrow(cs_train_maj)
 nrow(cs_train_maj_add)
 ```
 
-### 1b) Marginal Model Plots
+## 5-2 Marginal Model Plots
+# Need to Update!!
 
 ```{r}
 # residual plots
 #residualPlots(model.final)
 
 # Marginial Model Plots
-library(car)
-mmp(model.final)
+#library(car)
+#mmp(model.final)
 ```
-
 
 ### Maybe don't need session (END) ####
 ```{r}
