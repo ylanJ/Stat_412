@@ -25,6 +25,9 @@ library(caTools)
 #number_sections: true
 ```
 
+## Paper 12-15 pages
+## Presentation 6-8 mins
+
 ## 0. Cleaning Up Data and Creating Data Groups
 
 ### a) Remove NA Data
@@ -274,7 +277,6 @@ kmeans_model_train$centers #what each cluster's average values are for each vari
 #Cluster 3 and 4 are different than Cluster 1 and 2 in terms of the Response Variable.
 kmeans_model_train$size
 ```
-##Sample from Majority Data Proportional to Minority Data
 ```{r}
 set.seed(500)
 Majority <- cs_train_maj[,-which(names(cs_train_maj) == "X")]
@@ -511,18 +513,23 @@ giniplot = barplot(t(varimp[-2]/sum(varimp[-2])),las=2,cex.names=1, main="Gini I
 
 
 
-## 5-1 Evaluation on Final Model using Training Data
+### Model 1: GLM Model With Original Predictors - Training
+
+### a) Residual Plot (Only training no testing)
 
 ```{r}
 ## Set model as final model
 model.final <- model
 
+plot(model.final, 1:2)
+```
+
+### b) Confusion Matrix/Accuracy
+
+```{r}
 ## Evaluation on Final model using Training Data
 train_preds = predict(model.final, newdata=train.x, type="response")
 head(train_preds[is.na(train_preds)])
-
-#train.x[c(7,9),]
-#train_preds[is.na(train_preds)]
 
 pred_compare = prediction(train_preds, train.y)
 plot(performance(pred_compare, "acc"))
@@ -530,22 +537,8 @@ table(train.y, train_preds>0.2) # accurary on train
 ```
 
 
-## 5-2 Marginal Model Plots
-# Need to Update!!
-
-```{r}
-# residual plots
-#residualPlots(model.final)
-
-# Marginial Model Plots
-library(car)
-mmp(model.final)
-```
-
-
-##  5-3 Goodness of Fit using Hosmer-Lemeshow Test
-
-### a) 
+### c) Goodness of Fit using Hosmer-Lemeshow Test
+ 
 The p-value is 0, meaning that we want to reject the null hypothesis that the model is adequate.
 
 ```{r}
@@ -579,13 +572,13 @@ c(hlstat, nrow(hldf))
 
 ```
 
-### AUC
 
-## 5-3 Model Performance with Test Data
+### Model 1: GLM Model With Original Predictors - Testing
 
+### d) Confusion Matrix/Accuracy - Testing
 
 ```{r}
-#Final Model(w/ interaction term ReugularMedicine * PhysicallyActive)
+#Confusion Matrix on test data
 result_m2 = predict(model.final, newdata=test.x, type="response") 
 
 head(test.y)
@@ -594,8 +587,12 @@ pred_m2 = prediction(result_m2, test.y)
 
 plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
 table(test.y, result_m2>0.2)
+```
 
 
+### e) AUC
+
+```{r}
 #Accuracy :
 #Sensitivity : 
 #Specificity : 
@@ -607,21 +604,18 @@ abline(0,1)
 auc_ROCR2 <- performance(pred_m2, measure = "auc")
 auc_ROCR2@y.values[[1]]
 ```
-### 
 
-```{r}
-#predict(kmeans_model_train, newdata=test.x, type="response")
-prediction_result <- predict.glm(glm_pca_original_data, newdata = testing_data)
-prediction_result <- prediction_result[1:length(test.y)]
-head(test.y)
-prediction_pca = prediction(prediction_result, test.y)
-plot(performance(prediction_pca, "acc"))
-table(test.y, result_m2>0.2)
-plot(performance(prediction_pca,"tpr","fpr"), colorize=T)
-abline(0,1)
-pca_auc_ROCR2 <- performance(prediction_pca, measure = "auc")
-pca_auc_ROCR2@y.values[[1]]
-```
+
+### Model 2: ... - Training
+
+
+
+
+
+
+
+
+
 
 ```{r}
 
@@ -645,6 +639,23 @@ pca_auc_ROCR2@y.values[[1]]
 
 
 ## Maybe don't need session ##################################################################
+
+### PCA-Not sure how to predict with it (skip for now)
+
+```{r}
+#predict(kmeans_model_train, newdata=test.x, type="response")
+
+prediction_result <- predict.glm(glm_pca_original_data, newdata = testing_data)
+prediction_result <- prediction_result[1:length(test.y)]
+head(test.y)
+prediction_pca = prediction(prediction_result, test.y)
+plot(performance(prediction_pca, "acc"))
+table(test.y, result_m2>0.2)
+plot(performance(prediction_pca,"tpr","fpr"), colorize=T)
+abline(0,1)
+pca_auc_ROCR2 <- performance(prediction_pca, measure = "auc")
+pca_auc_ROCR2@y.values[[1]]
+```
 
 
 ### (0) Ensemble Learning Used by Paper
@@ -734,6 +745,18 @@ head(cs_train_maj_add)
 nrow(cs_train_maj)
 nrow(cs_train_maj_add)
 ```
+
+### 1b) Marginal Model Plots
+
+```{r}
+# residual plots
+#residualPlots(model.final)
+
+# Marginial Model Plots
+library(car)
+mmp(model.final)
+```
+
 
 ### Maybe don't need session (END) ####
 ```{r}
