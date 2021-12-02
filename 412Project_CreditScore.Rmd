@@ -294,7 +294,7 @@ Cluster4 <- subset.data.frame(Majority_with_cluster,cluster == 4)
 Cluster5 <- subset.data.frame(Majority_with_cluster, cluster == 5)
 Special_Small_Clusters <- sum(nrow(Cluster1),nrow(Cluster2),nrow(Cluster4))
 Sample3 <- Cluster3[sample(nrow(Cluster3), nrow(Cluster3)/(nrow(Majority) - Special_Small_Clusters) * nrow(cs_train_min), replace = FALSE),]
-Sample3
+head(Sample3)
 nrow(Sample3)
 Sample5 <- Cluster5[sample(nrow(Cluster5), nrow(Cluster5)/(nrow(Majority) - Special_Small_Clusters) * nrow(cs_train_min), replace = FALSE),]
 nrow(Sample5)
