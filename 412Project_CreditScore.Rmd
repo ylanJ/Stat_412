@@ -277,6 +277,7 @@ kmeans_model_train$centers #what each cluster's average values are for each vari
 #Cluster 3 and 4 are different than Cluster 1 and 2 in terms of the Response Variable.
 kmeans_model_train$size
 ```
+##Sample from Majority Data Proportional to Minority Data
 ```{r}
 set.seed(500)
 Majority <- cs_train_maj[,-which(names(cs_train_maj) == "X")]
@@ -289,17 +290,26 @@ head(Majority_with_cluster)
 ```
 
 ```{r}
+Cluster1 <- subset.data.frame(Majority_with_cluster,cluster == 1)
+Cluster2 <- subset.data.frame(Majority_with_cluster,cluster == 2)
 Cluster3 <- subset.data.frame(Majority_with_cluster,cluster == 3)
-Sample3 <- Cluster3[sample(nrow(Cluster3), nrow(Cluster3)/nrow(Majority) * nrow(cs_train_min), replace = FALSE),]
+Special_Small_Clusters <- sum(nrow(Cluster1),nrow(Cluster2),nrow(Cluster4))
+Cluster4 <- subset.data.frame(Majority_with_cluster,cluster == 4)
+Cluster5 <- subset.data.frame(Majority_with_cluster, cluster == 5)
+Sample3 <- Cluster3[sample(nrow(Cluster3), nrow(Cluster3)/(nrow(Majority) - Special_Small_Clusters) * nrow(cs_train_min), replace = FALSE),]
 Sample3
 nrow(Sample3)
-Cluster5 <- subset.data.frame(Majority_with_cluster, c(cluster == 5, cluster ==1, cluster == 2, cluster ==4))
-Sample5 <- Cluster5[sample(nrow(Cluster5), nrow(Cluster5)/nrow(Majority) * nrow(cs_train_min), replace = FALSE),]
+Sample5 <- Cluster5[sample(nrow(Cluster5), nrow(Cluster5)/(nrow(Majority) - Special_Small_Clusters) * nrow(cs_train_min), replace = FALSE),]
 nrow(Sample5)
-balanced_dataset.1 <- rbind(cs_train_min[-which(names(cs_train_min) == "X")], Sample3[-which(names(Sample3) == "cluster")], Sample5[-which(names(Sample5) == "cluster")])
+balanced_dataset.1 <- rbind(cs_train_min[-which(names(cs_train_min) == "X")],Cluster1[-which(names(Cluster1) == "cluster")], Cluster2[-which(names(Cluster2) == "cluster")], Sample3[-which(names(Sample3) == "cluster")],Cluster4[-which(names(Cluster4) == "cluster")], Sample5[-which(names(Sample5) == "cluster")])
 head(balanced_dataset.1)
+nrow(balanced_dataset.1)
 ```
 
+```{r}
+balanced_x <- data.matrix(balanced_dataset.1[,-1])
+balanced_y <- data.matrix(balanced_dataset.1[,1])
+```
 
 ```{r}
 Minority <- cs_train_min[,-which(names(cs_train_min) == "X")]
@@ -380,7 +390,14 @@ summary(glm_pca_dummy)
 ### 1 b) PCA with Balanced Data
 
 ```{r}
+pca_balanced <- prcomp(balanced_dataset.1[,-which(names(balanced_dataset.1) == "SeriousDlqin2yrs")])
+summary(pca_balanced) #99.98% Variance is explained by PC1
+pca_balanced$rotation[,1]
+```
 
+```{r}
+glm_pca_balanced <- glm(balanced_dataset.1$SeriousDlqin2yrs ~ pca_balanced$x[,1], family = "binomial")
+summary(glm_pca_balanced)
 ```
 
 
@@ -419,6 +436,25 @@ model2
 model2$rank # equals 7 which is how many variables are not NA
 #Certain Dummy Variables are a  Singular Matrix Meaning that some of our variables can be constructed using a linear combination of some of the columns
 #Not Sure what to do, but I'll remove these variables in the meantime
+```
+### 2 c) GLM Original Predictors  Using Balanced Data
+
+```{r}
+model_balanced <- glm(balanced_dataset.1$SeriousDlqin2yrs ~ ., data = balanced_dataset.1)
+summary(model_balanced)
+```
+
+```{r}
+stepAIC(model_balanced) #remove Debt Ratio and NumberOfOpenCreditLinesAndLoans
+```
+
+```{r}
+model_balanced_final <- glm(formula = balanced_dataset.1$SeriousDlqin2yrs ~ RevolvingUtilizationOfUnsecuredLines + 
+    age + NumberOfTime30.59DaysPastDueNotWorse + MonthlyIncome + 
+    NumberOfTimes90DaysLate + NumberRealEstateLoansOrLines + 
+    NumberOfTime60.89DaysPastDueNotWorse + NumberOfDependents, 
+    data = balanced_dataset.1)
+summary(model_balanced_final)
 ```
 
 ```{r}
@@ -463,6 +499,12 @@ ridge_model5
 
 ### 3 b) Ridge with Balanced Data
 
+```{r}
+x_for_ridge_balanced <- data.matrix(balanced_dataset.1[,-1])
+ridge_model_balanced <- cv.glmnet(x_for_ridge_balanced,balanced_dataset.1[,1], alpha = 0, standardize = TRUE, nfolds = length(balanced_dataset.1))
+ridge_model_balanced
+```
+
 ### Method 4: Lasso
 
 ### 4 a) Lasso with Unbalanced Data
@@ -475,7 +517,8 @@ lasso_model5
 ### 4 b) Lasso with Balanced Data
 
 ```{r}
-
+lasso_model_balanced <- cv.glmnet(x_for_ridge_balanced,balanced_dataset.1[,1], alpha = 1, standardize = TRUE, nfolds = length(balanced_dataset.1))
+lasso_model_balanced
 ```
 
 
@@ -500,7 +543,21 @@ giniplot = barplot(t(varimp[-2]/sum(varimp[-2])),las=2,cex.names=1, main="Gini I
 ## 4 b) Random Forest with Balanced Data
 
 ```{r}
+model_balanced.rf <- randomForest(y = as.factor(balanced_dataset.1$SeriousDlqin2yrs), x=balanced_x, xtest=test.x, ytest=as.factor(test.y), mtry = 3, importance = TRUE, keep.forest	= TRUE
+, na.action = na.omit)
 
+model_balanced.rf # Output shows confusion matrix for both train and test
+
+# Random Forest Output
+var_balanced.imp = data.frame(importance(model_balanced.rf, type=2))
+var_balanced.imp$Variables = row.names(var_balanced.imp)
+var_balancedimp = var_balanced.imp[order(var_balanced.imp$MeanDecreaseGini,decreasing = T),]
+par(mar = c(7.5,3,2,2)) 
+giniplot = barplot(t(var_balancedimp[-2]/sum(var_balancedimp[-2])),las=2,cex.names=1, main="Gini Impurity Index Plot")
+```
+
+```{r}
+getTree(model_balanced.rf, k = 1, labelVar =  TRUE)
 ```
 
 
