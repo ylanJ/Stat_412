@@ -274,7 +274,7 @@ kmeans_model_train$centers #what each cluster's average values are for each vari
 #Cluster 3 and 4 are different than Cluster 1 and 2 in terms of the Response Variable.
 kmeans_model_train$size
 ```
-##Sample from Majority Data Proportional to Minority Data
+### Sample from Majority Data Proportional to Minority Data
 ```{r}
 set.seed(500)
 Majority <- cs_train_maj[,-which(names(cs_train_maj) == "X")]
@@ -285,6 +285,27 @@ cluster_majority <-kmeans_model_train_majority$cluster
 Majority_with_cluster <- cbind(Majority, cluster = kmeans_model_train_majority$cluster)
 head(Majority_with_cluster)
 ```
+### Plot a scatter plot with Cluster Majority Group
+```{r}
+#Majority_with_cluster
+ggplot(data=Majority_with_cluster) + geom_point(aes(x=log(DebtRatio), 
+                                       y= log(RevolvingUtilizationOfUnsecuredLines), colour=cluster))+theme_bw()
+
+plot(age ~ log(MonthlyIncome), col= cluster, data = Majority_with_cluster)
+
+plot(log(RevolvingUtilizationOfUnsecuredLines) ~ log(DebtRatio), col= cluster, data = Majority_with_cluster)
+
+plot(age ~ log(MonthlyIncome), col= cluster, data = Majority_with_cluster)
+```
+
+```{r}
+#
+ggplot(data=Majority_with_cluster, aes(x=log(DebtRatio), 
+                                       y= log(RevolvingUtilizationOfUnsecuredLines)))+geom_point(size=1) + facet_grid(~ cluster)
+```
+
+
+
 
 ```{r}
 Cluster1 <- subset.data.frame(Majority_with_cluster,cluster == 1)
@@ -302,6 +323,7 @@ balanced_dataset.1 <- rbind(cs_train_min[-which(names(cs_train_min) == "X")],Clu
 head(balanced_dataset.1)
 nrow(balanced_dataset.1)
 ```
+
 ```{r}
 balanced_x <- data.matrix(balanced_dataset.1[,-1])
 balanced_y <- data.matrix(balanced_dataset.1[,1])
@@ -544,6 +566,24 @@ AICc
 AIC_unbalanced[4] <- AICc
 ```
 
+#### Plots for Lasso
+```{r}
+par(mfrow=c(1,2))
+require(lars)
+
+lmod2_d_LARS <- lars(as.matrix(train.x), train.y)
+plot(lmod2_d_LARS)
+
+# Crossvalidation to pick t with the lowest MSE
+set.seed(123)
+lmod2_d_CV <- cv.lars(as.matrix(train.x), train.y)
+
+# minimizing fraction and coefficients:
+lmod2_d_CV$index[which.min(lmod2_d_CV$cv)]
+
+predict(lmod2_d_LARS, s=0.85, type="coef", mode="fraction")$coef
+```
+
 ### 4 b) Lasso with Balanced Data
 
 ```{r}
@@ -676,8 +716,8 @@ result_m2 = predict(model.final, newdata=test.x, type="response")
 head(test.y)
 pred_m2 = prediction(result_m2, test.y)
 
-
-plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
+# Don't need to plot it for Testing
+#plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
 table(test.y, result_m2>0.2)
 
 
@@ -762,9 +802,9 @@ result_m2 = predict(model.final, newdata=test.x, type="response")
 head(test.y)
 pred_m2 = prediction(result_m2, test.y)
 
-
-plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
-table(test.y, result_m2>0.2)
+# Don't need to plot for test
+#plot(performance(pred_m2, "acc")) #It seems like 0.52 cutoff has the highest accuracy
+table(test.y, result_m2>0.66)
 
 
 #Accuracy :
